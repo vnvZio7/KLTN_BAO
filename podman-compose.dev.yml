@@ -1,0 +1,52 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+      target: dev
+    container_name: backend
+    image: backend
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./backend:/app:Z
+      - backend:/app/node_modules
+    # command: npm run dev
+    restart: unless-stopped
+    networks:
+      - db-net
+      - app-net
+    depends_on:
+      - mongo
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
+      target: dev
+    container_name: frontend
+    image: frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true # fix hot reload trong Docker (Linux)
+    volumes:
+      - ./frontend:/app:Z
+      - frontend:/app/node_modules
+    command: npm run dev
+    restart: unless-stopped
+    networks:
+      - app-net
+    depends_on:
+      - mongo
+
+volumes:
+  backend:
+  frontend:
+
+networks:
+  app-net:
+    driver: bridge
