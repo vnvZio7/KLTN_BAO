@@ -4,6 +4,17 @@ import tailwindcss from "@tailwindcss/vite";
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    global: {},
+  },
+  resolve: {
+    alias: {
+      stream: "stream-browserify",
+      events: "events",
+      util: "util",
+      process: "process/browser",
+    },
+  },
   plugins: [react(), tailwindcss()],
   server: {
     host: "0.0.0.0",

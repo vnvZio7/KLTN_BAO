@@ -16,10 +16,7 @@ services:
     # command: npm run dev
     restart: unless-stopped
     networks:
-      - db-net
       - app-net
-    depends_on:
-      - mongo
 
   frontend:
     build:
@@ -40,8 +37,6 @@ services:
     restart: unless-stopped
     networks:
       - app-net
-    depends_on:
-      - mongo
 
 volumes:
   backend:

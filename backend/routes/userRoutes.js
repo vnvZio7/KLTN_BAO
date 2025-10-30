@@ -8,4 +8,4 @@ const router = express.Router();
 router.get("/", getUsers);
 router.get("/:id", getUserById);
 
-module.exports = router;
+export default router;

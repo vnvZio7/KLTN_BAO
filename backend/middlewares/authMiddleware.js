@@ -1,4 +1,6 @@
-const User = require("../models/user.model");
+import Account from "../models/account.model";
+import User from "../models/user.model";
+import Doctor from "../models/doctor.model";
 const jwt = require("jsonwebtoken");
 
 // Middleware to protect routes
@@ -9,9 +11,15 @@ const protect = async (req, res, next) => {
     if (token && token.startsWith("Bearer")) {
       token = token.split(" ")[1]; // Extract token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findByPk(decoded.id, {
-        attributes: { exclude: ["password"] },
-      });
+      const account = await Account.findOne({ id: decoded._id }).select(
+        "-password"
+      );
+      req.account = account;
+      if (account.role === "user") {
+        req.user = await User.findOne({ accountId: account._id });
+      } else if (account.role === "doctor") {
+        req.user = await Doctor.findOne({ accountId: account._id });
+      }
       next();
     } else {
       res.status(401).json({ message: "Not authorized, no token" });

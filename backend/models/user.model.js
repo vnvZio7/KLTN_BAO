@@ -2,13 +2,13 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    full_name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    phone: { type: String },
-    gender: { type: String, enum: ["male", "female", "other"] },
-    birth_date: { type: Date },
-    role: { type: String, enum: ["user", "expert", "admin"], default: "user" },
+    accountId: { type: mongoose.Schema.Types.ObjectId, ref: "Account" },
+    psychologicalScore: Number,
+    disorderLevel: String,
+    walletBalance: { type: Number, default: 0 }, // so du
+    testHistory: [
+      { testId: mongoose.Schema.Types.ObjectId, result: Number, date: Date },
+    ],
   },
   { timestamps: true }
 );
