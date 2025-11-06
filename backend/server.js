@@ -7,6 +7,7 @@ import authRoutes from "./routes/authRoutes";
 import roomRoutes from "./routes/roomRoutes";
 import userRoutes from "./routes/userRoutes";
 import testRoutes from "./routes/testRoutes";
+import doctorRoutes from "./routes/doctorRoutes";
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/tests", testRoutes);
+app.use("/api/doctors", doctorRoutes);
 
 //Start Server
 const PORT = process.env.PORT || 8080;

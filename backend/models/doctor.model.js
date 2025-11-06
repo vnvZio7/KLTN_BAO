@@ -11,7 +11,9 @@ const doctorSchema = new mongoose.Schema({
   modalities: [{ type: String }], // ["CBT","ACT","Mindfulness","Family","Trauma-focused"]
   yearsExperience: Number,
   certificates: [String],
-  bio: String, // mô tả ngắn 2–3 câu
+  pricePerWeek: { type: Number, default: 0 },
+  bio: String,
+  avatar: String,
   approval: {
     status: {
       type: String,

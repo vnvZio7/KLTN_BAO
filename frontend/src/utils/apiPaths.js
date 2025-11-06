@@ -17,9 +17,9 @@ export const API_PATHS = {
     GET_ALL_SHOWS: "/api/admin/all-shows",
     GET_ALL_BOOKINGS: "/api/admin/all-bookings",
   },
-  CINEMAS: {
-    GET_ALL_CINEMAS: "/api/cinemas",
-    GET_CINEMA_BY_ID: (cinemaId) => `/api/cinemas/${cinemaId}`,
+  TESTS: {
+    GET_ALL_TEST: "/api/tests",
+    GET_TEST_BY_CODE: (code) => `/api/tests/${code}`,
   },
   MOVIES: {
     GET_ALL_MOVIES: "/api/movies/now-playing",

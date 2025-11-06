@@ -9,7 +9,14 @@ import { protect } from "../middlewares/authMiddleware";
 
 const router = express.Router();
 
-router.post("/register", upload.array("certificates", 10), registerUser);
+router.post(
+  "/register",
+  upload.fields([
+    { name: "avatar", maxCount: 1 },
+    { name: "certificates", maxCount: 10 },
+  ]),
+  registerUser
+);
 router.post("/login", loginUser);
 router.get("/profile", protect, getUserProfile);
 

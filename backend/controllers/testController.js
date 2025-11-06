@@ -9,7 +9,7 @@ const getTests = async (req, res) => {
   }
 };
 
-const getTestById = async (req, res) => {
+const getTestByCode = async (req, res) => {
   try {
     const test = await Test.findOne({ code: req.params.code });
     if (!test)
@@ -30,4 +30,4 @@ const createTest = async (req, res) => {
   }
 };
 
-export { getTests, getTestById, createTest };
+export { getTests, getTestByCode, createTest };

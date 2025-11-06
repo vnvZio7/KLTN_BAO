@@ -349,6 +349,7 @@ import Appointments from "./pages/Admin/Appointments";
 import Screenings from "./pages/Admin/Screenings";
 import DoctorHomeworkPage from "./pages/User/Homework";
 import PendingApproval from "./pages/Doctor/PendingApproval";
+import DoctorListWithPayment from "./pages/User/features/DoctorListWithPayment";
 
 export default function App() {
   return (
@@ -360,6 +361,8 @@ export default function App() {
       <Route path="/user" element={<Page />} />
       <Route path="/doctor" element={<DoctorPage />} />
       <Route path="/pending" element={<PendingApproval />} />
+      <Route path="/payment" element={<DoctorListWithPayment />} />
+
       {/* 🧩 Admin routes (ẩn trong layout riêng) */}
       <Route path="/admin" element={<AdminLayout />}>
         <Route path="dashboard" element={<Dashboard />} />

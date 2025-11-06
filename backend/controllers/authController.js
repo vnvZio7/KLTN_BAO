@@ -4,7 +4,10 @@ import { generateToken } from "../config/jwt";
 import Account from "../models/account.model";
 import Doctor from "../models/doctor.model";
 import User from "../models/user.model";
-import { uploadManyBuffers } from "../utils/uploadCloudinary";
+import {
+  uploadBufferToCloudinary,
+  uploadManyBuffers,
+} from "../utils/uploadCloudinary";
 
 const registerUser = async (req, res) => {
   try {
@@ -52,6 +55,7 @@ const registerUser = async (req, res) => {
         specializations = [],
         modalities = [],
         yearsExperience,
+        pricePerWeek,
         bio,
       } = profile;
 
@@ -59,6 +63,7 @@ const registerUser = async (req, res) => {
         !dRole ||
         !specializations.length ||
         !modalities.length ||
+        pricePerWeek == null ||
         !bio?.trim()
       ) {
         return res.status(400).json({
@@ -66,12 +71,21 @@ const registerUser = async (req, res) => {
         });
       }
 
-      // Upload chứng chỉ lên Cloudinary (nếu có)
+      // Upload avatar nếu có
+      let avatarUrl = "";
+      if (req.files?.avatar?.[0]) {
+        avatarUrl = await uploadBufferToCloudinary(
+          req.files.avatar[0].buffer,
+          "pomera/doctors/avatars"
+        );
+      }
+
+      // Upload certificates nếu có
       let certificateUrls = [];
-      if (Array.isArray(req.files) && req.files.length) {
+      if (req.files?.certificates?.length) {
         certificateUrls = await uploadManyBuffers(
-          req.files,
-          "pomera/certificates"
+          req.files.certificates,
+          "pomera/doctors/certificates"
         );
       }
 
@@ -81,6 +95,8 @@ const registerUser = async (req, res) => {
         specializations,
         modalities,
         yearsExperience,
+        pricePerWeek,
+        avatar: avatarUrl || undefined,
         bio,
         certificates: certificateUrls, // URL Cloudinary
         approval: { status: "pending" }, // chờ duyệt

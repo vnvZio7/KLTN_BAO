@@ -13,7 +13,6 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { API_URL } = useApi();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -27,25 +26,19 @@ export default function Login() {
     try {
       setLoading(true);
 
-      const res = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+      const res = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
+        email,
+        password,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Đăng nhập thất bại!");
-      console.log(data);
+      const data = res.data;
       // 🔹 Lưu token
       if (data.token) localStorage.setItem("token", data.token);
       if (data.account) localStorage.setItem("account", data.account);
-      console.log(localStorage.getItem("token"));
-      console.log(localStorage.getItem("account"));
+
       const response = await axiosInstance.get(API_PATHS.AUTH.GET_PROFILE);
       const userData = response.data.user;
-      console.log(data.account);
-      console.log(response);
-      console.log(userData);
+
       const role = data.account.role || "";
       if (role === "user") {
         if (userData.testHistory.length > 0) {
@@ -65,7 +58,6 @@ export default function Login() {
         navigate("/");
         return;
       }
-      console.log("✅ Đăng nhập thành công:", data);
       toast.success("Đăng nhập thành công!");
     } catch (err) {
       console.error("❌ Lỗi đăng nhập:", err.message);
