@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 const testSchema = new mongoose.Schema({
+  code: { type: String, unique: true, required: true },
   title: String,
   description: String,
   questions: [

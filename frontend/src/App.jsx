@@ -1,276 +1,3 @@
-// // import { useState } from 'react'
-// // import reactLogo from './assets/react.svg'
-// // import viteLogo from '/vite.svg'
-// // import './App.css'
-
-// // function App() {
-// //   const [count, setCount] = useState(0)
-
-// //   return (
-// //     <>
-// //       <div>
-// //         <a href="https://vite.dev" target="_blank">
-// //           <img src={viteLogo} className="logo" alt="Vite logo" />
-// //         </a>
-// //         <a href="https://react.dev" target="_blank">
-// //           <img src={reactLogo} className="logo react" alt="React logo" />
-// //         </a>
-// //       </div>
-// //       <h1>Vite + React</h1>
-// //       <div className="card">
-// //         <button onClick={() => setCount((count) => count + 1)}>
-// //           count is {count}
-// //         </button>
-// //         <p>
-// //           Edit <code>src/App.jsx</code> and save to test HMR
-// //         </p>
-// //       </div>
-// //       <p className="read-the-docs">
-// //         Click on the Vite and React logos to learn more
-// //       </p>
-// //     </>
-// //   )
-// // }
-
-// // App.js
-// // import React, { useState, useRef, useEffect } from "react";
-// // import { io } from "socket.io-client";
-
-// // const socket = io("http://localhost:8080");
-
-// // export default function App() {
-// //   const [myId, setMyId] = useState("");
-// //   const [callToId, setCallToId] = useState("");
-// //   const [incomingCall, setIncomingCall] = useState(null);
-// //   const [callAccepted, setCallAccepted] = useState(false);
-// //   const [connectedUserId, setConnectedUserId] = useState(null);
-
-// //   const [stream, setStream] = useState(null);
-
-// //   const localVideoRef = useRef();
-// //   const remoteVideoRef = useRef();
-
-// //   const peerConnection = useRef(null);
-
-// //   const servers = {
-// //     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-// //   };
-
-// //   useEffect(() => {
-// //     // Get user media stream
-// //     navigator.mediaDevices
-// //       .getUserMedia({ video: true, audio: true })
-// //       .then((stream) => {
-// //         setStream(stream);
-// //         if (localVideoRef.current) {
-// //           localVideoRef.current.srcObject = stream;
-// //         }
-// //       });
-
-// //     socket.on("connect", () => {
-// //       setMyId(socket.id);
-// //       socket.emit("register", socket.id);
-// //     });
-
-// //     socket.on("incoming-call", ({ from, offer }) => {
-// //       setIncomingCall({ from, offer });
-// //     });
-
-// //     socket.on("call-accepted", async ({ answer }) => {
-// //       setCallAccepted(true);
-// //       if (peerConnection.current) {
-// //         await peerConnection.current.setRemoteDescription(answer);
-// //       }
-// //     });
-
-// //     socket.on("ice-candidate", async ({ candidate }) => {
-// //       try {
-// //         if (peerConnection.current && candidate) {
-// //           await peerConnection.current.addIceCandidate(candidate);
-// //         }
-// //       } catch (err) {
-// //         console.error("Error adding received ice candidate", err);
-// //       }
-// //     });
-// //     socket.on("call-ended", () => {
-// //       handleEndCall();
-// //     });
-// //     return () => {
-// //       socket.off("incoming-call");
-// //       socket.off("call-accepted");
-// //       socket.off("ice-candidate");
-// //       socket.off("call-ended");
-// //     };
-// //   }, []);
-
-// //   const createPeerConnection = (otherUserId) => {
-// //     peerConnection.current = new RTCPeerConnection(servers);
-
-// //     // Send ICE candidates to other peer
-// //     peerConnection.current.onicecandidate = (event) => {
-// //       if (event.candidate) {
-// //         socket.emit("ice-candidate", {
-// //           to: otherUserId,
-// //           candidate: event.candidate,
-// //         });
-// //       }
-// //     };
-
-// //     // When remote track arrives
-// //     peerConnection.current.ontrack = (event) => {
-// //       if (remoteVideoRef.current) {
-// //         remoteVideoRef.current.srcObject = event.streams[0];
-// //       }
-// //     };
-
-// //     // Add local tracks to connection
-// //     if (stream) {
-// //       stream.getTracks().forEach((track) => {
-// //         peerConnection.current.addTrack(track, stream);
-// //       });
-// //     }
-// //   };
-
-// //   // Người gọi
-// //   const callUser = async () => {
-// //     if (!callToId) return alert("Nhập ID người muốn gọi");
-
-// //     createPeerConnection(callToId);
-// //     setConnectedUserId(callToId);
-
-// //     const offer = await peerConnection.current.createOffer();
-// //     await peerConnection.current.setLocalDescription(offer);
-
-// //     socket.emit("call-user", { from: myId, to: callToId, offer });
-// //   };
-
-// //   // Người nhận chấp nhận
-// //   const acceptCall = async () => {
-// //     setCallAccepted(true);
-// //     createPeerConnection(incomingCall.from);
-// //     setConnectedUserId(incomingCall.from);
-
-// //     await peerConnection.current.setRemoteDescription(incomingCall.offer);
-
-// //     const answer = await peerConnection.current.createAnswer();
-// //     await peerConnection.current.setLocalDescription(answer);
-
-// //     socket.emit("answer-call", { to: incomingCall.from, answer });
-
-// //     setIncomingCall(null);
-// //   };
-
-// //   // // Kết thúc call
-// //   // const endCall = () => {
-// //   //   if (peerConnection.current) {
-// //   //     peerConnection.current.close();
-// //   //     peerConnection.current = null;
-// //   //   }
-// //   //   setCallAccepted(false);
-// //   //   setIncomingCall(null);
-// //   //   setCallToId("");
-// //   //   if (remoteVideoRef.current) {
-// //   //     remoteVideoRef.current.srcObject = null;
-// //   //   }
-// //   // };
-// //   const handleEndCall = () => {
-// //     if (peerConnection.current) {
-// //       peerConnection.current.close();
-// //       peerConnection.current = null;
-// //     }
-
-// //     setCallAccepted(false);
-// //     setIncomingCall(null);
-// //     setCallToId("");
-// //     setConnectedUserId(null);
-
-// //     if (remoteVideoRef.current) {
-// //       remoteVideoRef.current.srcObject = null;
-// //     }
-// //   };
-
-// //   const endCall = () => {
-// //     // const otherUserId = incomingCall?.from || callToId;
-// //     // if (otherUserId) {
-// //     //   socket.emit("end-call", { to: otherUserId });
-// //     // }
-// //     if (connectedUserId) {
-// //       socket.emit("end-call", { to: connectedUserId });
-// //     }
-// //     handleEndCall();
-// //   };
-
-// //   return (
-// //     <div className="flex flex-col items-center p-8 space-y-6">
-// //       <h1 className="text-2xl font-bold">Video Call Simple</h1>
-// //       <div>
-// //         <p>
-// //           Your ID: <span className="font-mono">{myId}</span>
-// //         </p>
-// //       </div>
-
-// //       {!callAccepted && !incomingCall && (
-// //         <div>
-// //           <input
-// //             type="text"
-// //             placeholder="ID người muốn gọi"
-// //             className="border px-3 py-2 rounded"
-// //             value={callToId}
-// //             onChange={(e) => setCallToId(e.target.value)}
-// //           />
-// //           <button
-// //             onClick={callUser}
-// //             className="ml-3 bg-blue-600 text-red-500 px-4 py-2 rounded hover:bg-blue-700"
-// //           >
-// //             Call
-// //           </button>
-// //         </div>
-// //       )}
-
-// //       {incomingCall && !callAccepted && (
-// //         <div className="p-4 border rounded bg-yellow-100">
-// //           <p>{incomingCall.from} đang gọi bạn</p>
-// //           <button
-// //             onClick={acceptCall}
-// //             className="bg-green-600 text-red-500 px-4 py-2 rounded mr-2 hover:bg-green-700"
-// //           >
-// //             Accept
-// //           </button>
-// //           <button
-// //             onClick={() => setIncomingCall(null)}
-// //             className="bg-red-600 text-red-500 px-4 py-2 rounded hover:bg-red-700"
-// //           >
-// //             Reject
-// //           </button>
-// //         </div>
-// //       )}
-
-// //       {callAccepted && (
-// //         <button
-// //           onClick={endCall}
-// //           className="bg-red-600 text-red-500 px-4 py-2 rounded hover:bg-red-700"
-// //         >
-// //           End Call
-// //         </button>
-// //       )}
-
-// //       <div className="flex space-x-4 mt-4">
-// //         <video
-// //           ref={localVideoRef}
-// //           autoPlay
-// //           muted
-// //           className="w-48 h-36 bg-black rounded"
-// //         />
-// //         <video
-// //           ref={remoteVideoRef}
-// //           autoPlay
-// //           className="w-48 h-36 bg-black rounded"
-// //         />
-// //       </div>
-// //     </div>
-// //   );
-// // }
-
 // // import React, { useState, useEffect, useRef } from "react";
 // // import { io } from "socket.io-client";
 
@@ -606,38 +333,62 @@
 // //   );
 // // }
 
+import { Routes, Route } from "react-router-dom";
+
+import Home from "./pages/Guess/Home";
+import Login from "./pages/Auth/Login";
+import Register from "./pages/Auth/Register";
+import TestAndMatch from "./components/user/TestAndMatch";
+import Page from "./pages/User/Page";
+import DoctorPage from "./pages/Doctor/DoctorPage";
+import AdminLayout from "./components/admin/AdminLayout";
+import Dashboard from "./pages/Admin/Dashboard";
+import Users from "./pages/Admin/Users";
+import Doctors from "./pages/Admin/Doctors";
+import Appointments from "./pages/Admin/Appointments";
+import Screenings from "./pages/Admin/Screenings";
+import DoctorHomeworkPage from "./pages/User/Homework";
+import PendingApproval from "./pages/Doctor/PendingApproval";
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/test" element={<TestAndMatch />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/user" element={<Page />} />
+      <Route path="/doctor" element={<DoctorPage />} />
+      <Route path="/pending" element={<PendingApproval />} />
+      {/* 🧩 Admin routes (ẩn trong layout riêng) */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="users" element={<Users />} />
+        <Route path="doctors" element={<Doctors />} />
+        <Route path="appointments" element={<Appointments />} />
+        <Route path="screenings" element={<Screenings />} />
+      </Route>
+    </Routes>
+  );
+}
+
 // import { BrowserRouter, Routes, Route } from "react-router-dom";
-// import Login from "./pages/Login";
 // import Room from "./pages/Room";
+// import HomePage from "./pages/HomePage";
+// import { SocketProvider } from "./providers/Socket";
+// import { PeerProvider } from "./providers/Peer";
 
 // export default function App() {
 //   return (
 //     <BrowserRouter>
-//       <Routes>
-//         <Route path="/" element={<Login />} />
-//         <Route path="/room/:id" element={<Room />} />
-//       </Routes>
+//       <SocketProvider>
+//         <PeerProvider>
+//           <Routes>
+//             <Route path="/" element={<HomePage />} />
+//             <Route path="/rooms/:roomId" element={<Room />} />
+//           </Routes>
+//         </PeerProvider>
+//       </SocketProvider>
 //     </BrowserRouter>
 //   );
 // }
-
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Room from "./pages/Room";
-import HomePage from "./pages/HomePage";
-import { SocketProvider } from "./providers/Socket";
-import { PeerProvider } from "./providers/Peer";
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <SocketProvider>
-        <PeerProvider>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/rooms/:roomId" element={<Room />} />
-          </Routes>
-        </PeerProvider>
-      </SocketProvider>
-    </BrowserRouter>
-  );
-}

@@ -4,17 +4,35 @@ import { generateToken } from "../config/jwt";
 import Account from "../models/account.model";
 import Doctor from "../models/doctor.model";
 import User from "../models/user.model";
+import { uploadManyBuffers } from "../utils/uploadCloudinary";
 
 const registerUser = async (req, res) => {
   try {
-    const { fullName, email, password, phone, gender, birthDate, role } =
-      req.body;
+    if (!req.body?.data) {
+      return res.status(400).json({ message: "Thiếu 'data' trong FormData" });
+    }
 
-    // kiểm tra trùng email
-    const existing = await Account.findOne({ email });
-    if (existing) return res.status(400).json({ message: "Email đã tồn tại" });
+    // 'data' là string JSON vì FE đã append JSON.stringify(payload)
+    const parsed = JSON.parse(req.body.data);
+    const {
+      fullName,
+      email,
+      password,
+      phone,
+      gender,
+      birthDate,
+      role,
+      profile = {},
+    } = parsed;
 
-    // tạo account
+    if (!fullName || !email || !password || !gender || !birthDate || !role) {
+      return res.status(400).json({ message: "Thiếu trường bắt buộc" });
+    }
+
+    const existed = await Account.findOne({ email });
+    if (existed) return res.status(400).json({ message: "Email đã tồn tại" });
+
+    // 1) Tạo account
     const account = await Account.create({
       fullName,
       email,
@@ -25,33 +43,64 @@ const registerUser = async (req, res) => {
       role,
     });
 
-    // tạo profile
+    // 2) Tạo hồ sơ theo role
     if (role === "user") {
-      await User.create({
-        accountId: account._id,
-      });
+      await User.create({ accountId: account._id });
     } else if (role === "doctor") {
+      const {
+        role: dRole,
+        specializations = [],
+        modalities = [],
+        yearsExperience,
+        bio,
+      } = profile;
+
+      if (
+        !dRole ||
+        !specializations.length ||
+        !modalities.length ||
+        !bio?.trim()
+      ) {
+        return res.status(400).json({
+          message: "Thiếu thông tin chuyên môn (role/spec/modalities/bio)",
+        });
+      }
+
+      // Upload chứng chỉ lên Cloudinary (nếu có)
+      let certificateUrls = [];
+      if (Array.isArray(req.files) && req.files.length) {
+        certificateUrls = await uploadManyBuffers(
+          req.files,
+          "pomera/certificates"
+        );
+      }
+
       await Doctor.create({
         accountId: account._id,
-        specialization: req.body.specialization, // chuyen mon
-        externalFactor: req.body.externalFactor, // yeu to tac dong
-        experience: req.body.experience,
-        certificates: req.body.certificates,
-        description: req.body.description,
+        role: dRole, // counselor | therapist | psychiatrist
+        specializations,
+        modalities,
+        yearsExperience,
+        bio,
+        certificates: certificateUrls, // URL Cloudinary
+        approval: { status: "pending" }, // chờ duyệt
       });
+    } else {
+      return res.status(400).json({ message: "role không hợp lệ" });
     }
-    // // Return user data with JWT
-    // res.status(201).json({
-    //   id: account._id,
-    //   fullName,
-    //   email,
-    //   role,
-    //   token: generateToken(account._id),
-    //   message: "Đăng ký thành công",
-    // });
-    res.status(201).json({ message: "Đăng ký thành công", account });
-  } catch (error) {
-    res.status(500).json({ message: "Lỗi server", error: error.message });
+
+    return res.status(201).json({
+      message: "Đăng ký thành công",
+      account: {
+        _id: account._id,
+        fullName: account.fullName,
+        email: account.email,
+        role: account.role,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };
 
@@ -61,18 +110,22 @@ const loginUser = async (req, res) => {
     const account = await Account.findOne({ email });
 
     if (!account) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res
+        .status(401)
+        .json({ message: "Email hoặc mật khẩu không hợp lệ" });
     }
 
     // Compare password
     const isMatch = await account.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password1" });
+      return res
+        .status(401)
+        .json({ message: "Email hoặc mật khẩu không hợp lệ" });
     }
 
     // Return user data with JWT
     res.json({
-      user: {
+      account: {
         _id: account.id,
         fullName: account.fullName,
         email: account.email,
@@ -84,4 +137,22 @@ const loginUser = async (req, res) => {
     res.status(500).json({ message: "Lỗi server", error: error.message });
   }
 };
-export { registerUser, loginUser };
+
+const getUserProfile = async (req, res) => {
+  try {
+    res.json({ user: req.user });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const getProfileById = async (req, res) => {
+  try {
+    const account_id = req.params.id;
+
+    res.json({ account: req.account, user: req.user });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+export { registerUser, loginUser, getUserProfile, getProfileById };
