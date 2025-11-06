@@ -1,5 +1,7 @@
-const User = require("../models/user.model");
-const jwt = require("jsonwebtoken");
+import Account from "../models/account.model";
+import User from "../models/user.model";
+import Doctor from "../models/doctor.model";
+import jwt from "jsonwebtoken";
 
 // Middleware to protect routes
 const protect = async (req, res, next) => {
@@ -9,9 +11,15 @@ const protect = async (req, res, next) => {
     if (token && token.startsWith("Bearer")) {
       token = token.split(" ")[1]; // Extract token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findByPk(decoded.id, {
-        attributes: { exclude: ["password"] },
-      });
+      const account = await Account.findOne({ _id: decoded.id }).select(
+        "-password"
+      );
+      req.account = account;
+      if (account.role === "user") {
+        req.user = await User.findOne({ accountId: account._id });
+      } else if (account.role === "doctor") {
+        req.user = await Doctor.findOne({ accountId: account._id });
+      }
       next();
     } else {
       res.status(401).json({ message: "Not authorized, no token" });
@@ -23,11 +31,11 @@ const protect = async (req, res, next) => {
 
 // Middleware for Admin-only access
 const adminOnly = (req, res, next) => {
-  if (req.user && req.user.role === "ADMIN") {
+  if (req.account && req.account.role === "admin") {
     next();
   } else {
     res.status(403).json({ message: "Access denied, admin only" });
   }
 };
 
-module.exports = { protect, adminOnly };
+export { protect, adminOnly };

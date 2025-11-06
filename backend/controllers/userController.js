@@ -4,7 +4,7 @@ import User from "../models/user.model";
 // @access  Private (Admin)
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find({ role: "USER" }).select("-password");
+    const users = await User.find().populate("accountId").select("-password");
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -16,7 +16,9 @@ const getUsers = async (req, res) => {
 // @access  Private
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const user = await User.findById(req.params.id)
+      .populate("accountId")
+      .select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
   } catch (error) {
@@ -24,4 +26,4 @@ const getUserById = async (req, res) => {
   }
 };
 
-module.exports = { getUsers, getUserById };
+export { getUsers, getUserById };
