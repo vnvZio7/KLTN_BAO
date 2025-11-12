@@ -1,10 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { prettyTime } from "../../../../utils/helper";
 import { INITIAL_MESSAGES } from "../../../../utils/data";
 
-export default function ChatPage({ doctor, setUnreadChat }) {
+export default function ChatPage({
+  doctor,
+  setUnreadChat,
+  onComplete, // optional: callback khi đánh dấu hoàn thành
+  onSendComplete, // optional: callback gửi yêu cầu hoàn thành tới bác sĩ/backend
+}) {
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [text, setText] = useState("");
+  const [completed, setCompleted] = useState(false);
   const listRef = useRef(null);
 
   const send = () => {
@@ -23,13 +30,50 @@ export default function ChatPage({ doctor, setUnreadChat }) {
         {
           id: Math.random().toString(36).slice(2),
           from: "doctor",
-          text: "Mình đã nhận tin. Bạn thử thở 4‑7‑8 5 phút nhé!",
+          text: "Mình đã nhận tin. Bạn thử thở 4-7-8 5 phút nhé!",
           time: new Date().toISOString(),
         },
       ]);
-      setUnreadChat((c) => c + 1);
+      setUnreadChat?.((c) => (typeof c === "number" ? c + 1 : c));
     }, 900);
   };
+
+  const handleComplete = async () => {
+    const ok = window.confirm(
+      "Bạn có chắc chắn muốn hoàn thành khóa điều trị này không?"
+    );
+    if (!ok) return;
+
+    // 1) Ẩn nút
+    setCompleted(true);
+
+    // 2) Thêm system message để cả hai phía đều thấy lịch sử yêu cầu
+    const sysMsg = {
+      id: Math.random().toString(36).slice(2),
+      from: "system",
+      text: "Bạn đã đánh dấu HOÀN THÀNH khóa điều trị. Yêu cầu đã được gửi tới bác sĩ.",
+      time: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, sysMsg]);
+
+    // 3) Gửi callback lên parent/backend nếu cần
+    try {
+      await onSendComplete?.({
+        doctorId: doctor?.id,
+        at: new Date().toISOString(),
+        type: "chat_completed_request",
+      });
+      // thông báo badge/unread cho phía bác sĩ (tuỳ ý)
+      setUnreadChat?.((c) => (typeof c === "number" ? c + 1 : c));
+    } catch (e) {
+      // Nếu lỗi gửi backend, vẫn giữ trạng thái completed & message
+      console.error("Send complete request failed:", e);
+    }
+
+    // 4) Callback hoàn thành cho parent (tuỳ chọn)
+    onComplete?.();
+  };
+
   useEffect(() => {
     listRef.current?.scrollTo({
       top: listRef.current.scrollHeight,
@@ -38,7 +82,20 @@ export default function ChatPage({ doctor, setUnreadChat }) {
   }, [messages]);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 h-[72vh] flex flex-col">
+    <div className="relative bg-white rounded-2xl shadow-sm border border-slate-200 h-[72vh] flex flex-col">
+      {/* Nút Hoàn thành (ẩn sau khi đã hoàn thành) */}
+      {!completed && (
+        <button
+          onClick={handleComplete}
+          className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-white shadow-sm"
+          aria-label="Đánh dấu hoàn thành"
+          title="Đánh dấu hoàn thành"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          Hoàn thành
+        </button>
+      )}
+
       {/* Header chat có ảnh bác sĩ */}
       <div className="p-4 border-b border-slate-200 flex items-center gap-3">
         <img
@@ -51,31 +108,51 @@ export default function ChatPage({ doctor, setUnreadChat }) {
           <div className="text-xs text-emerald-700">● Trực tuyến</div>
         </div>
       </div>
+
+      {/* Messages */}
       <div
         ref={listRef}
         className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"
       >
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`max-w-[70%] rounded-2xl px-4 py-2 shadow-sm ${
-              m.from === "user"
-                ? "ml-auto bg-indigo-600 text-white"
-                : "mr-auto bg-white border border-slate-200"
-            }`}
-          >
-            <div className="text-sm leading-relaxed">{m.text}</div>
+        {messages.map((m) => {
+          if (m.from === "system") {
+            return (
+              <div
+                key={m.id}
+                className="mx-auto max-w-[80%] text-center text-xs text-slate-600"
+              >
+                <div className="inline-block rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+                  {m.text}
+                </div>
+                <div className="mt-1 text-[11px] text-slate-400">
+                  {prettyTime(m.time)}
+                </div>
+              </div>
+            );
+          }
+          return (
             <div
-              className={`mt-1 text-[11px] ${
-                m.from === "user" ? "text-indigo-100" : "text-slate-500"
+              key={m.id}
+              className={`max-w-[70%] rounded-2xl px-4 py-2 shadow-sm ${
+                m.from === "user"
+                  ? "ml-auto bg-indigo-600 text-white"
+                  : "mr-auto bg-white border border-slate-200"
               }`}
             >
-              {prettyTime(m.time)}
+              <div className="text-sm leading-relaxed">{m.text}</div>
+              <div
+                className={`mt-1 text-[11px] ${
+                  m.from === "user" ? "text-indigo-100" : "text-slate-500"
+                }`}
+              >
+                {prettyTime(m.time)}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
+      {/* Composer */}
       <div className="p-3 border-t border-slate-200 flex items-center gap-2">
         <input
           className="flex-1 rounded-xl border border-slate-300 px-3 py-2"

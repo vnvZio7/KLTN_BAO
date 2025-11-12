@@ -1,7 +1,11 @@
 import mongoose from "mongoose";
 
 const doctorSchema = new mongoose.Schema({
-  accountId: { type: mongoose.Schema.Types.ObjectId, ref: "Account" },
+  accountId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Account",
+    index: true,
+  },
   role: {
     type: String,
     enum: ["counselor", "therapist", "psychiatrist"],
@@ -11,7 +15,9 @@ const doctorSchema = new mongoose.Schema({
   modalities: [{ type: String }], // ["CBT","ACT","Mindfulness","Family","Trauma-focused"]
   yearsExperience: Number,
   certificates: [String],
-  bio: String, // mô tả ngắn 2–3 câu
+  pricePerWeek: { type: Number, default: 0 },
+  bio: String,
+  avatar: String,
   approval: {
     status: {
       type: String,
@@ -24,6 +30,8 @@ const doctorSchema = new mongoose.Schema({
     },
   },
   rating: { type: Number, default: 0 },
+  reviewsCount: { type: Number, default: 0 },
 });
+doctorSchema.index({ specializations: 1, modalities: 1, pricePerWeek: 1 });
 
 module.exports = mongoose.model("Doctor", doctorSchema);

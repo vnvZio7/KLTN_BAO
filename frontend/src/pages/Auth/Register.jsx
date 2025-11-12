@@ -1,7 +1,8 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { EyeIcon, EyeOffIcon, CheckCircle2, X } from "lucide-react";
+import { API_PATHS } from "../../utils/apiPaths";
 
-const API_BASE = import.meta.env.VITE_BASE_URL;
+const BASE_URL = import.meta.env.VITE_BASE_URL;
 
 const passwordRegex =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&.~#^_+\-=])[A-Za-z\d@$!%*?&.~#^_+\-=]{8,}$/;
@@ -49,6 +50,8 @@ export default function Register() {
     specializationsText: "",
     modalitiesText: "",
     yearsExperience: "",
+    pricePerWeek: "", // NEW
+    avatarFile: null, // NEW
     bio: "",
     certificatesFiles: [], // File[]
   });
@@ -72,6 +75,8 @@ export default function Register() {
     specializationsText: useRef(null),
     modalitiesText: useRef(null),
     yearsExperience: useRef(null),
+    pricePerWeek: useRef(null), // NEW
+    avatarFile: useRef(null), // NEW
     bio: useRef(null),
     certificatesFiles: useRef(null),
   };
@@ -119,7 +124,7 @@ export default function Register() {
     return true;
   };
 
-  // Bước 2: MỌI TRƯỜNG BẮT BUỘC
+  // Bước 2: MỌI TRƯỜNG BẮT BUỘC (role, specializationsText, modalitiesText, yearsExperience, pricePerWeek, avatarFile, bio, certificatesFiles >=1)
   const validateStep2 = () => {
     if (!form.role) {
       setError("Vui lòng chọn Vai trò (role).");
@@ -135,19 +140,42 @@ export default function Register() {
       setError("Vui lòng nhập ít nhất 1 Phương pháp (modalities).");
       return focusField("modalitiesText"), false;
     }
+    // yearsExperience
     if (String(form.yearsExperience || "").trim() === "") {
       setError("Vui lòng nhập Số năm kinh nghiệm.");
       return focusField("yearsExperience"), false;
     }
-    const n = Number(form.yearsExperience);
-    if (Number.isNaN(n) || n < 0) {
+    const y = Number(form.yearsExperience);
+    if (Number.isNaN(y) || y < 0) {
       setError("Số năm kinh nghiệm không hợp lệ.");
       return focusField("yearsExperience"), false;
     }
+    // pricePerWeek
+    if (String(form.pricePerWeek || "").trim() === "") {
+      setError("Vui lòng nhập Giá theo tuần.");
+      return focusField("pricePerWeek"), false;
+    }
+    const p = Number(form.pricePerWeek);
+    if (Number.isNaN(p) || p < 0) {
+      setError("Giá theo tuần không hợp lệ.");
+      return focusField("pricePerWeek"), false;
+    }
+    // avatar
+    if (!form.avatarFile) {
+      setError("Vui lòng tải ảnh đại diện (avatar).");
+      setTouched((t) => ({ ...t, avatarFile: true }));
+      refs.avatarFile?.current?.scrollIntoView?.({
+        behavior: "smooth",
+        block: "center",
+      });
+      return false;
+    }
+    // bio
     if (!form.bio.trim()) {
       setError("Vui lòng nhập Giới thiệu ngắn (bio).");
       return focusField("bio"), false;
     }
+    // certificates
     if (
       !Array.isArray(form.certificatesFiles) ||
       form.certificatesFiles.length === 0
@@ -177,6 +205,8 @@ export default function Register() {
       specializationsText: "",
       modalitiesText: "",
       yearsExperience: "",
+      pricePerWeek: "",
+      avatarFile: null,
       bio: "",
       certificatesFiles: [],
     });
@@ -192,7 +222,7 @@ export default function Register() {
       setError("");
       setSuccess("");
 
-      // 🔹 build dữ liệu chung
+      // build payload chung
       const payload = {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
@@ -200,35 +230,35 @@ export default function Register() {
         phone: form.phone?.trim() || undefined,
         gender: form.gender,
         birthDate: form.birthDate,
-        role: accountType, // "user" hoặc "doctor"
+        role: accountType, // "user" | "doctor"
       };
 
-      // 🔹 nếu là doctor thì thêm phần profile
       if (accountType === "doctor") {
         payload.profile = {
           role: form.role, // counselor | therapist | psychiatrist
           specializations: csvToArray(form.specializationsText),
           modalities: csvToArray(form.modalitiesText),
           yearsExperience: Number(form.yearsExperience),
+          pricePerWeek: Number(form.pricePerWeek), // NEW
           bio: form.bio.trim(),
         };
       }
 
-      // 🔹 tạo FormData dùng chung
       const fd = new FormData();
       fd.append("data", JSON.stringify(payload));
-
-      if (accountType === "doctor" && form.certificatesFiles?.length) {
-        form.certificatesFiles.forEach((file) =>
-          fd.append("certificates", file)
-        );
+      if (accountType === "doctor") {
+        if (form.avatarFile) fd.append("avatar", form.avatarFile); // NEW
+        if (form.certificatesFiles?.length) {
+          form.certificatesFiles.forEach((file) =>
+            fd.append("certificates", file)
+          );
+        }
       }
 
       logFormData(fd);
-      // 🔹 Gửi chỉ 1 lần duy nhất
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
+      const res = await fetch(BASE_URL + API_PATHS.AUTH.REGISTER, {
         method: "POST",
-        body: fd, // KHÔNG cần set headers
+        body: fd,
       });
 
       const data = await res.json();
@@ -278,6 +308,12 @@ export default function Register() {
     touched.certificatesFiles &&
     (!Array.isArray(form.certificatesFiles) ||
       form.certificatesFiles.length === 0);
+
+  const showAvatarError =
+    accountType === "doctor" &&
+    step === 2 &&
+    touched.avatarFile &&
+    !form.avatarFile;
 
   return (
     <div className="register-form min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-blue-50 via-sky-50 to-teal-50">
@@ -558,6 +594,7 @@ export default function Register() {
                 </p>
               </div>
 
+              {/* Vai trò */}
               <div className="md:col-span-2">
                 <label className="block text-gray-700 font-medium mb-2">
                   Vai trò *
@@ -581,6 +618,7 @@ export default function Register() {
                 </select>
               </div>
 
+              {/* Chuyên môn */}
               <div className="md:col-span-2">
                 <label className="block text-gray-700 font-medium mb-2">
                   Chuyên môn *
@@ -606,6 +644,7 @@ export default function Register() {
                 </p>
               </div>
 
+              {/* Phương pháp */}
               <div className="md:col-span-2">
                 <label className="block text-gray-700 font-medium mb-2">
                   Phương pháp *
@@ -628,97 +667,169 @@ export default function Register() {
                 />
               </div>
 
-              <div>
-                <label className="block text-gray-700 font-medium mb-2">
-                  Số năm kinh nghiệm *
-                </label>
-                <input
-                  ref={refs.yearsExperience}
-                  type="number"
-                  min={0}
-                  name="yearsExperience"
-                  value={form.yearsExperience}
-                  onChange={handleChange}
-                  onBlur={() =>
-                    setTouched({ ...touched, yearsExperience: true })
-                  }
-                  placeholder="VD: 8"
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none ${
-                    isInvalid("yearsExperience")
-                      ? "border-red-400 focus:ring-red-400"
-                      : "border-gray-300 focus:ring-teal-500"
-                  }`}
-                />
+              {/* HÀNG: Số năm kinh nghiệm + Giá theo tuần */}
+              <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Số năm kinh nghiệm *
+                  </label>
+                  <input
+                    ref={refs.yearsExperience}
+                    type="number"
+                    min={0}
+                    name="yearsExperience"
+                    value={form.yearsExperience}
+                    onChange={handleChange}
+                    onBlur={() =>
+                      setTouched({ ...touched, yearsExperience: true })
+                    }
+                    placeholder="VD: 8"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none ${
+                      isInvalid("yearsExperience")
+                        ? "border-red-400 focus:ring-red-400"
+                        : "border-gray-300 focus:ring-teal-500"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Giá theo tuần (VND) *
+                  </label>
+                  <input
+                    ref={refs.pricePerWeek}
+                    type="number"
+                    min={0}
+                    name="pricePerWeek"
+                    value={form.pricePerWeek}
+                    onChange={handleChange}
+                    onBlur={() =>
+                      setTouched({ ...touched, pricePerWeek: true })
+                    }
+                    placeholder="VD: 265000"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none ${
+                      isInvalid("pricePerWeek")
+                        ? "border-red-400 focus:ring-red-400"
+                        : "border-gray-300 focus:ring-teal-500"
+                    }`}
+                  />
+                </div>
               </div>
 
-              <div className="md:col-span-1" ref={refs.certificatesFiles}>
-                <label className="block text-gray-700 font-medium mb-2">
-                  Chứng chỉ (ảnh) *
-                </label>
-                <input
-                  type="file"
-                  name="certificates"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    setForm((prev) => ({ ...prev, certificatesFiles: files }));
-                    setTouched((p) => ({ ...p, certificatesFiles: true }));
-                  }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none ${
-                    showCertError
-                      ? "border-red-400 focus:ring-red-400"
-                      : "border-gray-300 focus:ring-teal-500"
-                  }`}
-                />
-                <p
-                  className={`mt-1 text-xs ${
-                    showCertError ? "text-red-500" : "text-gray-500"
-                  }`}
-                >
-                  {showCertError
-                    ? "Cần tải lên ít nhất 1 ảnh chứng chỉ."
-                    : "Có thể chọn nhiều ảnh. (Gửi bằng FormData)"}
-                </p>
-              </div>
-
-              <div className="md:col-span-1">
-                {Array.isArray(form.certificatesFiles) &&
-                  form.certificatesFiles.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2">
-                      {form.certificatesFiles.map((file, i) => {
-                        const url = URL.createObjectURL(file);
-                        return (
-                          <div key={i} className="relative group">
-                            <img
-                              src={url}
-                              alt={`cert-${i}`}
-                              className="w-full h-20 object-cover rounded-lg border"
-                              onLoad={() => URL.revokeObjectURL(url)}
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setForm((prev) => ({
-                                  ...prev,
-                                  certificatesFiles:
-                                    prev.certificatesFiles.filter(
-                                      (_, idx) => idx !== i
-                                    ),
-                                }))
-                              }
-                              className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
-                              title="Xóa ảnh"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        );
-                      })}
+              {/* HÀNG: Avatar + Chứng chỉ */}
+              <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+                {/* Avatar */}
+                <div ref={refs.avatarFile}>
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Ảnh đại diện (avatar) *
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] || null;
+                      setForm((prev) => ({ ...prev, avatarFile: f }));
+                      setTouched((p) => ({ ...p, avatarFile: true }));
+                    }}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none ${
+                      showAvatarError
+                        ? "border-red-400 focus:ring-red-400"
+                        : "border-gray-300 focus:ring-teal-500"
+                    }`}
+                  />
+                  <p
+                    className={`mt-1 text-xs ${
+                      showAvatarError ? "text-red-500" : "text-gray-500"
+                    }`}
+                  >
+                    {showAvatarError
+                      ? "Cần tải ảnh đại diện."
+                      : "Ảnh JPG/PNG ≤ 5MB."}
+                  </p>
+                  {form.avatarFile && (
+                    <div className="mt-2">
+                      <img
+                        className="h-20 w-20 rounded-full border object-cover"
+                        src={URL.createObjectURL(form.avatarFile)}
+                        onLoad={(e) => URL.revokeObjectURL(e.currentTarget.src)}
+                        alt="avatar preview"
+                      />
                     </div>
                   )}
+                </div>
+
+                {/* Chứng chỉ */}
+                <div ref={refs.certificatesFiles}>
+                  <label className="block text-gray-700 font-medium mb-2">
+                    Chứng chỉ (ảnh) *
+                  </label>
+                  <input
+                    type="file"
+                    name="certificates"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setForm((prev) => ({
+                        ...prev,
+                        certificatesFiles: files,
+                      }));
+                      setTouched((p) => ({ ...p, certificatesFiles: true }));
+                    }}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none ${
+                      showCertError
+                        ? "border-red-400 focus:ring-red-400"
+                        : "border-gray-300 focus:ring-teal-500"
+                    }`}
+                  />
+                  <p
+                    className={`mt-1 text-xs ${
+                      showCertError ? "text-red-500" : "text-gray-500"
+                    }`}
+                  >
+                    {showCertError
+                      ? "Cần tải lên ít nhất 1 ảnh chứng chỉ."
+                      : "Có thể chọn nhiều ảnh (gửi bằng FormData)."}
+                  </p>
+
+                  {Array.isArray(form.certificatesFiles) &&
+                    form.certificatesFiles.length > 0 && (
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        {form.certificatesFiles.map((file, i) => {
+                          const url = URL.createObjectURL(file);
+                          return (
+                            <div key={i} className="relative group">
+                              <img
+                                src={url}
+                                alt={`cert-${i}`}
+                                className="w-full h-20 object-cover rounded-lg border"
+                                onLoad={() => URL.revokeObjectURL(url)}
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    certificatesFiles:
+                                      prev.certificatesFiles.filter(
+                                        (_, idx) => idx !== i
+                                      ),
+                                  }))
+                                }
+                                className="absolute -top-2 -right-2 bg-rose-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition"
+                                title="Xóa ảnh"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                </div>
               </div>
 
+              {/* Bio */}
               <div className="md:col-span-2">
                 <label className="block text-gray-700 font-medium mb-2">
                   Giới thiệu ngắn (bio) *

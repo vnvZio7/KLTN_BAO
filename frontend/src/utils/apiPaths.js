@@ -17,25 +17,24 @@ export const API_PATHS = {
     GET_ALL_SHOWS: "/api/admin/all-shows",
     GET_ALL_BOOKINGS: "/api/admin/all-bookings",
   },
-  CINEMAS: {
-    GET_ALL_CINEMAS: "/api/cinemas",
-    GET_CINEMA_BY_ID: (cinemaId) => `/api/cinemas/${cinemaId}`,
+  TESTS: {
+    GET_ALL_TEST: "/api/tests",
+    GET_TEST_BY_CODE: (code) => `/api/tests/${encodeURIComponent(code)}`,
   },
-  MOVIES: {
-    GET_ALL_MOVIES: "/api/movies/now-playing",
+  DOCTORS: {
+    GET_ALL_DOCTORS: "/api/doctors",
     GET_TRAILERS: "/api/movies/trailers",
     GET_UPCOMING: "/api/movies/upcoming",
     GET_DATA_SEARCH: "/api/movies/search",
     GET_MOVIE_BY_ID: (movieId) => `/api/movies/${movieId}`,
     GET_RELEASE_BY_ID: (movieId) => `/api/movies/release/${movieId}`,
   },
-  ROOMS: {
-    GET_ALL_ROOMS: "/api/rooms",
-    GET_SEAT_MAP_BY_ID: (roomId) => `/api/rooms/${roomId}/seats`,
+  GROQ: {
+    GROQ_MATCH_DOCTOR: "/api/groq",
   },
-  TYPES: {
+  TRANSACTIONS: {
     GET_ALL_TYPES: "/api/types",
-    GET_TYPE_BY_ID: (typeId) => `/api/types/${typeId}`,
+    GET_TRANSACTION_BY_CODE: (code) => `/api/transactions/${code}`,
   },
   PROVINCES: {
     GET_ALL_PROVINCES: "/api/provinces",

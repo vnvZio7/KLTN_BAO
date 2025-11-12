@@ -55,3 +55,9 @@ export const prettyTime = (iso) =>
     month: "2-digit",
     year: "numeric",
   });
+
+export function generateTransactionCode() {
+  const timestamp = Date.now(); // số nguyên theo mili giây
+  const random = Math.floor(Math.random() * 1000); // thêm 3 chữ số ngẫu nhiên
+  return `BAO${timestamp}${random}`; // ví dụ: DH169987654321045
+}

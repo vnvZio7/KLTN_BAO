@@ -15,8 +15,6 @@ export default function Shell({
     { key: "homework", label: "Bài tập về nhà" },
 
     { key: "schedule", label: "Hẹn lịch video" },
-    { key: "switch", label: "Đổi bác sĩ" },
-    { key: "plan", label: "Liệu trình" },
     { key: "chat", label: "Nhắn tin", badge: unreadChat },
     { key: "notifications", label: "Thông báo", badge: unreadNotif },
     { key: "profile", label: "Thông tin cá nhân" },

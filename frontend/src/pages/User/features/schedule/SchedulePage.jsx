@@ -1,142 +1,183 @@
+// DemoDoctorAppointmentsOnly.jsx
 import React, { useMemo, useState } from "react";
-import { prettyTime } from "../../../../utils/helper";
 
-export default function SchedulePage({
+/** Utils: format ISO datetime to Vietnamese readable string */
+function prettyTime(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("vi-VN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * SchedulePage — chỉ hiển thị danh sách lịch hẹn với bác sĩ hiện tại
+ * - Không có form đặt lịch, không có nút huỷ
+ * - Nếu status = "upcoming" → hiện nút "Vào phòng"
+ * - Nếu status = "completed"/"complete" → hiện nút "Xem lại"
+ */
+function SchedulePage({
   doctor,
   appointments,
-  setAppointments,
-  onBooked,
+  onJoinRoom, // callback khi bấm "Vào phòng"
+  onReview, // callback khi bấm "Xem lại" (replay/notes)
 }) {
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [reason, setReason] = useState("");
-  const [loading, setLoading] = useState(false);
+  // Chỉ các lịch thuộc bác sĩ này, sắp xếp tăng dần theo thời gian
+  const doctorAppointments = useMemo(() => {
+    const list = (appointments || []).filter((a) => a.doctorId === doctor?.id);
+    return list.sort((a, b) => new Date(a.time) - new Date(b.time));
+  }, [appointments, doctor]);
 
-  const quickTimes = useMemo(
-    () =>
-      Array.from(
-        new Set((doctor?.nextSlots || []).map((s) => s.slice(11, 16)))
-      ),
-    [doctor]
-  );
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!date || !time) return alert("Vui lòng chọn ngày giờ");
-    setLoading(true);
-    try {
-      const iso = new Date(`${date}T${time}`).toISOString();
-      const item = {
-        id: Math.random().toString(36).slice(2),
-        doctorId: doctor.id,
-        doctorName: doctor.name,
-        time: iso,
-        status: "upcoming",
-        reason,
-      };
-      setAppointments([item, ...(appointments || [])]);
-      onBooked?.(item);
-      setReason("");
-    } finally {
-      setLoading(false);
-    }
+  const joinRoom = (appt) => {
+    onJoinRoom?.(appt);
+    if (!onJoinRoom) alert("Đi vào phòng gọi… (TODO: kết nối WebRTC)");
   };
+
+  const reviewAppt = (appt) => {
+    onReview?.(appt);
+    if (!onReview) alert("Xem lại cuộc hẹn… (TODO: mở ghi âm/ghi chú)");
+  };
+
   return (
     <div className="space-y-6">
       <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <h2 className="text-xl font-semibold mb-1">Đặt lịch gọi video</h2>
-        <p className="text-slate-600 mb-6">
-          Chọn thời gian phù hợp để gọi với {doctor?.name}.
-        </p>
-        <form onSubmit={submit} className="grid md:grid-cols-5 gap-4 items-end">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1">Ngày</label>
-            <input
-              type="date"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
-              min={new Date().toISOString().slice(0, 10)}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Giờ</label>
-            <input
-              type="time"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              list="quick-times"
-              required
-            />
-            <datalist id="quick-times">
-              {quickTimes.map((t) => (
-                <option key={t} value={t} />
-              ))}
-            </datalist>
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1">
-              Lý do (tuỳ chọn)
-            </label>
-            <input
-              type="text"
-              placeholder="VD: mất ngủ 3 ngày gần đây"
-              className="w-full rounded-xl border border-slate-300 px-3 py-2"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </div>
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full md:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {loading ? "Đang đặt…" : "Đặt lịch"}
-            </button>
-          </div>
-        </form>
-      </section>
-      <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-        <h3 className="text-lg font-semibold mb-1">Lịch đã đặt</h3>
+        <h3 className="text-lg font-semibold mb-1">
+          Lịch đã đặt với {doctor?.name || "bác sĩ"}
+        </h3>
         <p className="text-slate-600 mb-4">
-          Bạn sẽ nhận nhắc nhở trước 15 phút.
+          Hệ thống sẽ nhắc trước 15 phút. Mỗi lịch kéo dài <b>45 phút</b>.
         </p>
+
         <div className="divide-y">
-          {(appointments || []).length === 0 && (
-            <div className="text-slate-500">Chưa có lịch hẹn nào.</div>
+          {doctorAppointments.length === 0 && (
+            <div className="text-slate-500">
+              Chưa có lịch hẹn nào với {doctor?.name || "bác sĩ"}.
+            </div>
           )}
-          {(appointments || []).map((a) => (
-            <div key={a.id} className="py-3 flex items-center justify-between">
-              <div>
-                <div className="font-medium">{prettyTime(a.time)}</div>
-                <div className="text-sm text-slate-600">
-                  {a.doctorName} · {a.reason || "Không có ghi chú"}
+
+          {doctorAppointments.map((a) => {
+            const isUpcoming = a.status === "upcoming";
+            const isCompleted =
+              a.status === "completed" || a.status === "complete";
+
+            return (
+              <div
+                key={a.id}
+                className="py-3 flex items-center justify-between"
+              >
+                <div>
+                  <div className="font-medium">{prettyTime(a.time)}</div>
+                  <div className="text-sm text-slate-600">
+                    {a.reason || "Không có ghi chú"} · {a.durationMinutes || 45}{" "}
+                    phút
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      isUpcoming
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : isCompleted
+                        ? "bg-sky-50 text-sky-700 border border-sky-200"
+                        : "bg-slate-100 text-slate-700 border border-slate-200"
+                    }`}
+                  >
+                    {isUpcoming
+                      ? "Sắp diễn ra"
+                      : isCompleted
+                      ? "Hoàn thành"
+                      : a.status}
+                  </span>
+
+                  {isUpcoming && (
+                    <button
+                      type="button"
+                      onClick={() => joinRoom(a)}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                    >
+                      Vào phòng
+                    </button>
+                  )}
+
+                  {isCompleted && (
+                    <button
+                      type="button"
+                      onClick={() => reviewAppt(a)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700"
+                    >
+                      Xem lại
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    a.status === "upcoming"
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-slate-100 text-slate-700 border border-slate-200"
-                  }`}
-                >
-                  {a.status === "upcoming" ? "Sắp diễn ra" : a.status}
-                </span>
-                <button className="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700">
-                  Huỷ
-                </button>
-                <button className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
-                  Vào phòng
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
+    </div>
+  );
+}
+
+/* --------------------------- DATA MẪU --------------------------- */
+const SAMPLE_DOCTOR = {
+  id: "d001",
+  name: "TS.BS. Nguyễn An",
+};
+
+const SAMPLE_APPOINTMENTS = [
+  {
+    id: "apt_01",
+    doctorId: "d001",
+    doctorName: "TS.BS. Nguyễn An",
+    time: "2025-11-13T09:00:00+07:00",
+    durationMinutes: 45,
+    status: "upcoming",
+    reason: "Mất ngủ 3 ngày gần đây",
+  },
+  {
+    id: "apt_02",
+    doctorId: "d001",
+    doctorName: "TS.BS. Nguyễn An",
+    time: "2025-11-15T14:30:00+07:00",
+    durationMinutes: 45,
+    status: "upcoming",
+    reason: "Căng thẳng công việc",
+  },
+  {
+    id: "apt_03",
+    doctorId: "d001",
+    doctorName: "TS.BS. Nguyễn An",
+    time: "2025-11-16T10:15:00+07:00",
+    durationMinutes: 45,
+    status: "completed",
+    reason: "Lo âu khi thuyết trình",
+  },
+];
+
+/* --------------------------- DEMO WRAPPER --------------------------- */
+export default function DemoDoctorAppointmentsOnly() {
+  const [appointments] = useState(SAMPLE_APPOINTMENTS);
+
+  return (
+    <div className="p-6 bg-slate-50 min-h-screen">
+      <SchedulePage
+        doctor={SAMPLE_DOCTOR}
+        appointments={appointments}
+        onJoinRoom={(appt) => {
+          console.log("Join room:", appt);
+          alert(`Vào phòng: ${appt.id}`);
+        }}
+        onReview={(appt) => {
+          console.log("Review appointment:", appt);
+          alert(`Xem lại: ${appt.id}`);
+        }}
+      />
     </div>
   );
 }
