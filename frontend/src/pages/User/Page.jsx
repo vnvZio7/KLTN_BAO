@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Shell from "../../components/user/Shell";
 import SchedulePage from "./features/schedule/SchedulePage";
-import SwitchDoctorPage from "./features/switch/SwitchDoctorPage";
-import PlanPage from "./features/plan/PlanPage";
 import ChatPage from "./features/chat/ChatPage";
 import NotificationsPage from "./features/notifications/NotificationsPage";
 import ProfilePage from "./features/profile/ProfilePage";
-import { DOCTORS, MOCK_PLAN, MOCK_BILLING } from "../../utils/data";
+import { DOCTORS, MOCK_BILLING } from "../../utils/data";
 import UserStatsPage from "./features/stats/UserStatsPage";
 import DoctorInfoPage from "./features/doctor/DoctorInfoPage";
 import DoctorHomeworkPage from "./Homework";
@@ -113,23 +111,15 @@ export default function Page() {
       {active === "doctor" && (
         <DoctorInfoPage
           doctor={currentDoctor}
-          onGoSchedule={() => setActive("schedule")}
-          onSwitch={(d) => {
-            setCurrentDoctor(d);
+          suggestions={DOCTORS} // <— truyền mảng gợi ý
+          onSwitch={(picked) => {
+            setCurrentDoctor(picked); // picked đã đúng shape card
+            // (tuỳ chọn) gọi API yêu cầu đổi bác sĩ ở đây
             setActive("doctor");
           }}
         />
       )}
-      {active === "switch" && (
-        <SwitchDoctorPage
-          currentDoctor={currentDoctor}
-          onSwitch={(d) => {
-            setCurrentDoctor(d);
-            setActive("schedule");
-          }}
-        />
-      )}
-      {active === "plan" && <PlanPage plan={MOCK_PLAN} />}
+
       {active === "homework" && <DoctorHomeworkPage />}
 
       {active === "chat" && (

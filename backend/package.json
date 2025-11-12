@@ -19,6 +19,7 @@
   "homepage": "https://github.com/vnvZio7/KLTN_BAO#readme",
   "description": "",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.9.0",
     "bcryptjs": "^3.0.2",
     "cloudinary": "^2.8.0",
@@ -29,6 +30,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.15.1",
     "multer": "^2.0.2",
+    "openai": "^6.8.1",
     "socket.io": "^4.8.1",
     "streamifier": "^0.1.1",
     "zod": "^4.1.12"

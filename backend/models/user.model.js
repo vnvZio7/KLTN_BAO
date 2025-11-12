@@ -2,12 +2,14 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    accountId: { type: mongoose.Schema.Types.ObjectId, ref: "Account" },
-    psychologicalScore: Number,
-    disorderLevel: String,
-    testHistory: [
-      { testId: mongoose.Schema.Types.ObjectId, result: Number, date: Date },
-    ],
+    accountId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Account",
+      index: true,
+    },
+    lastPHQ9Score: Number,
+    lastGAD7Score: Number,
+    currentDoctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
   },
   { timestamps: true }
 );

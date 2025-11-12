@@ -1,41 +1,55 @@
 // src/pages/TestAndMatch.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import axiosInstance from "../../utils/axiosInstance";
+import { API_PATHS } from "../../utils/apiPaths";
+import { ChevronLeft } from "lucide-react";
+import PaymentModal from "../payments/PaymentModal";
+import { generateTransactionCode } from "../../utils/helper";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
-const CODES = ["PHQ-9", "GAD-7"]; // có thể mở rộng sau này
+const CODES = ["PHQ-9", "GAD-7"]; // Thứ tự: PHQ-9 trước, GAD-7 sau
 
 export default function TestAndMatch() {
-  const [step, setStep] = useState(1); // 1: PHQ-9, 2: GAD-7, 3: Match, 4: Review
-  const totalSteps = 4;
+  // Bước: 1 = Quizz (PHQ-9 + GAD-7), 2 = Match, 3 = Review
+  const [step, setStep] = useState(1);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [testsMap, setTestsMap] = useState({}); // { code: {code,title,description,questions[]} }
   const [answers, setAnswers] = useState({}); // { code: number[] }
-  const [pickedDoctorId, setPickedDoctorId] = useState(null);
+  const [cur, setCur] = useState(0); // chỉ số câu *gộp* toàn bộ quizz
 
-  // dữ liệu đề xuất từ backend
+  // Đề xuất bác sĩ
   const [matchLoading, setMatchLoading] = useState(false);
   const [matchError, setMatchError] = useState("");
   const [doctors, setDoctors] = useState([]);
-
-  // Thêm sau các useState khác
+  const [reason, setReason] = useState("");
+  const [pickedDoctorId, setPickedDoctorId] = useState(null);
   const [sortKey, setSortKey] = useState("best"); // best | rating | experience | priceAsc | priceDesc | name
 
-  // tuỳ hệ thống auth
-  const token = ""; // ví dụ: localStorage.getItem("access_token") || "";
+  const [orderCode, setOrderCode] = useState(null);
 
-  // --- Fetch từng test theo code ---
+  const [open, setOpen] = React.useState(false);
+
+  const token = ""; // ví dụ auth
+  const navigate = useNavigate();
+
+  // ---------- Tải 2 bài test ----------
   useEffect(() => {
     let mounted = true;
 
     const fetchTest = async (code) => {
-      const res = await fetch(
-        `http://localhost:8080/api/tests/${encodeURIComponent(code)}`
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok)
-        throw new Error(data?.message || `Không tải được test ${code}`);
-      return data; // { code,title,description,questions:[{question,options[],scores[]}] }
+      try {
+        const res = await axiosInstance.get(
+          API_PATHS.TESTS.GET_TEST_BY_CODE(code)
+        );
+        return res.data;
+      } catch (err) {
+        const message =
+          err.response?.data?.message || `Không tải được test ${code}`;
+        throw new Error(message);
+      }
     };
 
     (async () => {
@@ -43,21 +57,18 @@ export default function TestAndMatch() {
         setLoading(true);
         setError("");
         const results = {};
-        for (const code of CODES) {
-          const t = await fetchTest(code);
-          results[code] = t;
-        }
+        for (const code of CODES) results[code] = await fetchTest(code);
         if (!mounted) return;
-
         setTestsMap(results);
 
-        // khởi tạo answers theo từng code
+        // init answers theo từng code
         const init = {};
         for (const code of CODES) {
           const len = results[code]?.questions?.length || 0;
           init[code] = Array(len).fill(null);
         }
         setAnswers(init);
+        setCur(0);
       } catch (e) {
         if (mounted)
           setError(e.message || "Đã có lỗi xảy ra khi tải bài test.");
@@ -69,42 +80,26 @@ export default function TestAndMatch() {
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const progress = Math.round((step / totalSteps) * 100);
-
-  const currentCode = step === 1 ? CODES[0] : step === 2 ? CODES[1] : null;
-  const currentTest = currentCode ? testsMap[currentCode] : null;
-
-  const validateStep = () => {
-    if (step === 1 || step === 2) {
-      const t = currentTest;
-      if (!t) return false;
-      const arr = answers[t.code] || [];
-      return (
-        arr.length === (t.questions?.length || 0) &&
-        arr.every((x) => x !== null)
+  // ---------- Gộp câu hỏi của PHQ-9 + GAD-7 ----------
+  // Mỗi phần tử: { code, qIndex, q, title, desc }
+  const joined = useMemo(() => {
+    const arr = [];
+    for (const code of CODES) {
+      const t = testsMap[code];
+      const qs = t?.questions || [];
+      qs.forEach((q, i) =>
+        arr.push({ code, qIndex: i, q, title: t?.title, desc: t?.description })
       );
     }
-    if (step === 3) {
-      return doctors.length === 0 || !!pickedDoctorId;
-    }
-    return true;
-  };
+    return arr;
+  }, [testsMap]);
 
-  const goNext = () => {
-    if (!validateStep()) {
-      if (step === 3 && doctors.length > 0)
-        return alert("Vui lòng chọn một bác sĩ.");
-      return alert("Vui lòng trả lời đầy đủ câu hỏi trong bước này.");
-    }
-    setStep((s) => Math.min(totalSteps, s + 1));
-  };
+  const totalAll = joined.length;
+  const curEntry = joined[cur] || null;
 
-  const goBack = () => setStep((s) => Math.max(1, s - 1));
-
-  // điểm tạm tính để hiển thị (chỉ phục vụ UI)
+  // ---------- Điểm tạm (cho Review) ----------
   const computed = useMemo(() => {
     const out = {};
     for (const code of CODES) {
@@ -112,20 +107,18 @@ export default function TestAndMatch() {
       if (!t) continue;
       const pickedIdx = answers[code] || [];
       const total = pickedIdx.reduce((sum, idx, i) => {
-        if (idx === null || idx === undefined) return sum;
-        const q = t.questions[i];
-        const score = q?.scores?.[idx] ?? 0;
-        return sum + score;
+        if (idx == null) return sum;
+        const sc = t.questions[i]?.scores?.[idx] ?? 0;
+        return sum + sc;
       }, 0);
       out[code] = { score: total, count: pickedIdx.length };
     }
     return out;
   }, [testsMap, answers]);
 
-  // --- Khi vào bước 3: gửi câu trả lời lên backend để lấy danh sách bác sĩ ---
+  // ---------- Khi vào bước 2: gọi backend match bác sĩ ----------
   useEffect(() => {
-    const shouldFetch =
-      step === 3 && Object.keys(testsMap).length === CODES.length;
+    const shouldFetch = step === 2 && CODES.every((c) => !!testsMap[c]);
     if (!shouldFetch) return;
 
     let mounted = true;
@@ -133,28 +126,28 @@ export default function TestAndMatch() {
       try {
         setMatchLoading(true);
         setMatchError("");
-        setPickedDoctorId(null);
+        // Không tự reset pickedDoctorId nếu user quay lại từ bước 3
+        if (pickedDoctorId == null) setPickedDoctorId(null);
         setDoctors([]);
+        setReason("");
 
         const payload = {
           tests: CODES.map((code) => ({
             code,
-            answers: answers[code], // mảng index đáp án đã chọn
-            // Nếu backend muốn điểm: bật dòng dưới
-            // scores: answers[code].map((idx, i) => testsMap[code].questions[i].scores[idx]),
+            scores: (answers[code] || []).map(
+              (idx, i) => testsMap[code].questions[i].scores[idx]
+            ),
           })),
         };
 
-        const res = await fetch("http://localhost:8080/api/doctors", {
-          method: "GET",
-        });
-        console.log(payload);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok)
-          throw new Error(data?.message || "Không lấy được danh sách bác sĩ.");
-        if (!mounted) return;
+        const response = await axiosInstance.post(
+          API_PATHS.GROQ.GROQ_MATCH_DOCTOR,
+          { payload }
+        );
 
-        // Expecting: { doctors:[ {id, fullName, role, specialization[], bio, ...extraFields} ] }
+        if (!mounted) return;
+        const data = response?.data?.doctors || [];
+        setReason(response?.data?.reason || "");
         setDoctors(Array.isArray(data) ? data : []);
       } catch (e) {
         if (mounted)
@@ -169,105 +162,70 @@ export default function TestAndMatch() {
     };
   }, [step, testsMap, answers, token]);
 
-  const submitFinal = async () => {
-    try {
-      const payload = {
-        tests: CODES.map((code) => ({
-          code,
-          answers: answers[code],
-        })),
-        doctorId: pickedDoctorId || null,
-      };
-
-      const res = await fetch("/api/screening/submit-choice", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || "Gửi xác nhận thất bại.");
-
-      alert("Đã gửi xác nhận lựa chọn bác sĩ thành công!");
-      console.log("SERVER RESPONSE:", data);
-    } catch (e) {
-      alert(e.message || "Đã có lỗi xảy ra khi gửi xác nhận.");
-    }
-  };
-  // Helper lấy tên hiển thị
-  const getDocName = (d) => d?.accountId?.fullName || d?.fullName || "";
-
-  // Danh sách đã sắp xếp theo sortKey
-  const sortedDoctors = useMemo(() => {
-    const arr = Array.isArray(doctors) ? [...doctors] : [];
-    switch (sortKey) {
-      case "rating":
-        arr.sort((a, b) => (b?.rating ?? 0) - (a?.rating ?? 0));
-        break;
-      case "experience":
-        arr.sort(
-          (a, b) => (b?.yearsExperience ?? 0) - (a?.yearsExperience ?? 0)
-        );
-        break;
-      case "priceAsc":
-        arr.sort(
-          (a, b) =>
-            (a?.pricePerWeek ?? Infinity) - (b?.pricePerWeek ?? Infinity)
-        );
-        break;
-      case "priceDesc":
-        arr.sort(
-          (a, b) =>
-            (b?.pricePerWeek ?? -Infinity) - (a?.pricePerWeek ?? -Infinity)
-        );
-        break;
-      case "name":
-        arr.sort((a, b) => getDocName(a).localeCompare(getDocName(b), "vi"));
-        break;
-      case "best":
-      default:
-        // giữ nguyên thứ tự backend
-        break;
-    }
-    return arr;
-  }, [doctors, sortKey]);
-
-  // -----------------------
-  // UI helpers
-  // -----------------------
+  // ---------- Helpers UI ----------
   const Card = ({ children }) => (
     <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-xl p-6">
       {children}
     </div>
   );
-
   const Badge = ({ children }) => (
     <span className="inline-block text-xs px-2 py-1 rounded-full border border-gray-200 bg-gray-50 text-gray-700 mr-1 mb-1">
       {children}
     </span>
   );
-
   const StarRating = ({ rating = 0 }) => {
     const r = Math.max(0, Math.min(5, Number(rating) || 0));
+    const full = Math.floor(r);
+    const half = r - full >= 0.25 && r - full < 0.75;
+    const total = 5;
     return (
       <div className="flex items-center gap-1">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <svg
-            key={i}
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            className={`w-4 h-4 ${i < r ? "fill-yellow-400" : "fill-gray-200"}`}
-          >
-            <path d="M10 15l-5.878 3.09L5.5 11.545.5 7.41l6.06-.88L10 1l3.44 5.53 6.06.88-5 4.136 1.378 6.545z" />
-          </svg>
-        ))}
+        {Array.from({ length: total }).map((_, i) => {
+          if (i < full)
+            return (
+              <svg
+                key={i}
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                className="w-4 h-4 fill-yellow-400"
+              >
+                <path d="M10 15l-5.878 3.09L5.5 11.545.5 7.41l6.06-.88L10 1l3.44 5.53 6.06.88-5 4.136 1.378 6.545z" />
+              </svg>
+            );
+          if (i === full && half)
+            return (
+              <svg
+                key={i}
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                className="w-4 h-4"
+              >
+                <defs>
+                  <linearGradient id={`half${i}`}>
+                    <stop offset="50%" stopColor="#facc15" />
+                    <stop offset="50%" stopColor="#e5e7eb" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M10 15l-5.878 3.09L5.5 11.545.5 7.41l6.06-.88L10 1l3.44 5.53 6.06.88-5 4.136 1.378 6.545z"
+                  fill={`url(#half${i})`}
+                />
+              </svg>
+            );
+          return (
+            <svg
+              key={i}
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              className="w-4 h-4 fill-gray-200"
+            >
+              <path d="M10 15l-5.878 3.09L5.5 11.545.5 7.41l6.06-.88L10 1l3.44 5.53 6.06.88-5 4.136 1.378 6.545z" />
+            </svg>
+          );
+        })}
       </div>
     );
   };
-
   const formatCurrencyVND = (v) => {
     if (v == null) return null;
     try {
@@ -280,243 +238,228 @@ export default function TestAndMatch() {
     }
   };
 
-  const formatSlot = (iso) => {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString("vi-VN", {
-        weekday: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-      });
-    } catch {
-      return iso;
-    }
-  };
+  // ---------- Quizz gộp (mỗi đáp án 1 dòng, KHÔNG radio, KHÔNG ABCD, KHÔNG css trạng thái đã chọn; chữ căn giữa; nút nhỏ) ----------
+  const QuizCombined = () => {
+    if (!curEntry) return null;
+    const { code, qIndex, q, title, desc } = curEntry;
 
-  const RadioMatrix = ({ test }) => {
-    const values = answers[test.code] || [];
-    const onPick = (qIdx, optIdx) => {
+    const pick = (optIdx) => {
       setAnswers((prev) => {
         const next = { ...prev };
-        const arr = [...(next[test.code] || [])];
-        arr[qIdx] = optIdx;
-        next[test.code] = arr;
+        const arr = [...(next[code] || [])];
+        arr[qIndex] = optIdx;
+        next[code] = arr;
         return next;
       });
+      const isLast = cur >= totalAll - 1;
+      setTimeout(() => {
+        if (!isLast) setCur((c) => c + 1);
+        else {
+          setStep(2); // hết câu cuối → sang ghép bác sĩ
+          window.scrollTo(0, 0);
+        }
+      }, 80);
     };
+
+    const goPrev = () => setCur((c) => Math.max(0, c - 1));
 
     return (
       <Card>
-        <h3 className="text-xl font-semibold text-gray-800 mb-1">
-          {test.title}
-        </h3>
-        {test.description && (
-          <p className="text-sm text-gray-600 mb-4">{test.description}</p>
-        )}
-        <div className="space-y-4">
-          {test.questions.map((q, idx) => (
-            <div key={idx} className="border border-gray-200 rounded-xl p-4">
-              <p className="font-medium text-gray-800 mb-3">
-                {idx + 1}. {q.question}
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                {(q.options || []).map((label, optIdx) => (
-                  <label
-                    key={optIdx}
-                    className={`flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer transition
-                      ${
-                        values[idx] === optIdx
-                          ? "border-teal-500 bg-teal-50"
-                          : "border-gray-200 hover:bg-gray-50"
-                      }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`${test.code}_${idx}`}
-                      className="accent-teal-600"
-                      checked={values[idx] === optIdx}
-                      onChange={() => onPick(idx, optIdx)}
-                    />
-                    <span className="text-sm text-gray-700">{label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
+        <div className="relative">
+          {/* Nút quay lại ẩn khi là câu đầu tiên */}
+          {cur > 0 && (
+            <button
+              onClick={goPrev}
+              className="absolute inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Quay lại câu trước
+            </button>
+          )}
+          {/* Tiêu đề test theo câu hiện tại */}
+          <h2 className="text-2xl font-semibold text-teal-700 mb-2 text-center">
+            {title || code}
+          </h2>
+          {desc ? (
+            <p className="text-sm text-gray-600 mb-4 text-center">{desc}</p>
+          ) : null}
+        </div>
+
+        <div className="border border-gray-200 rounded-xl p-4">
+          <p className="font-medium text-gray-800 mb-3 text-center">
+            {cur + 1}. {q?.question}
+          </p>
+
+          {/* MỖI ĐÁP ÁN 1 DÒNG - BUTTON NHỎ, CHỮ CĂN GIỮA, KHÔNG CSS "ĐÃ CHỌN" */}
+          <div className="space-y-2">
+            {(q?.options || []).map((label, optIdx) => (
+              <button
+                key={optIdx}
+                type="button"
+                onClick={() => pick(optIdx)}
+                className="w-full text-center px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </Card>
     );
   };
 
-  // Thẻ bác sĩ chi tiết (Bước 3)
+  // ---------- Thẻ bác sĩ ----------
+  // Card dọc: avatar tròn, tick góc, có label từng phần
   const DoctorCard = ({ d, picked, onPick }) => {
     const [open, setOpen] = useState(false);
+    const name = d?.accountId?.fullName || d?.fullName || "—";
     const priceText = formatCurrencyVND(d?.pricePerWeek);
-    const topSlots = Array.isArray(d?.nextSlots) ? d.nextSlots.slice(0, 3) : [];
+    const specializations = d?.specializations || d?.specialization || [];
+    const modalities = d?.modalities || [];
 
     return (
       <label
-        className={`border rounded-2xl p-4 cursor-pointer transition block hover:shadow
-          ${
-            picked
-              ? "border-teal-600 ring-2 ring-teal-200 bg-teal-50"
-              : "border-gray-200 bg-white"
-          }`}
+        className={`group relative flex flex-col h-full overflow-hidden rounded-2xl border bg-white transition-all duration-300 ${
+          picked
+            ? "border-teal-600 ring-2 ring-teal-200 shadow-md scale-[1.02]"
+            : "border-gray-200 hover:-translate-y-[2px] hover:shadow-lg"
+        }`}
       >
         <input
           type="radio"
           name="doctor"
-          className="hidden"
+          className="sr-only"
           checked={picked}
           onChange={onPick}
         />
-        <div className="flex gap-4">
-          <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-gray-100">
-            {d?.photo ? (
-              <img
-                src={d.photo}
-                alt={d.accountId.fullName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                No Img
-              </div>
-            )}
-          </div>
-          <div className="flex-1">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="font-semibold text-gray-900">
-                  {d?.accountId.fullName || "—"}
-                </div>
-                <div className="text-sm text-teal-700">{d?.role || "—"}</div>
-              </div>
-              {picked && (
-                <span className="text-xs px-2 py-1 rounded-full bg-teal-600 text-white">
-                  Đã chọn
-                </span>
-              )}
-            </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              {"rating" in d && (
-                <div className="flex items-center gap-2">
-                  <StarRating rating={d.rating} />
-                  <span className="text-xs text-gray-600">
-                    {Number(d.rating || 0).toFixed(1)}
-                    {d.reviewsCount ? ` (${d.reviewsCount})` : ""}
+        {/* Dấu tick góc khi đã chọn */}
+        {picked && (
+          <div className="absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-teal-600 text-white shadow-md">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+              className="h-4 w-4"
+            >
+              <path
+                fillRule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-7.071 7.071a1 1 0 01-1.414 0L3.293 9.85a1 1 0 011.414-1.415l3.1 3.1 6.364-6.364a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+        )}
+
+        {/* Header: Avatar */}
+        <div className="relative flex justify-center pt-6 pb-2">
+          <div className="rounded-full p-[3px] bg-gradient-to-br from-teal-400 via-sky-400 to-teal-400">
+            <div className="h-20 w-20 rounded-full bg-white overflow-hidden flex items-center justify-center ring-2 ring-white">
+              {d?.avatar ? (
+                <img
+                  src={d.avatar}
+                  alt={name}
+                  loading="lazy"
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                  <span className="text-base font-semibold text-gray-600">
+                    {getInitials(name)}
                   </span>
                 </div>
               )}
-              {d?.yearsExperience != null && (
+            </div>
+          </div>
+        </div>
+
+        {/* Nội dung */}
+        <div className="flex-1 px-4 pb-4 text-sm text-gray-700">
+          <h3 className="text-base font-semibold text-gray-900 text-center">
+            {name}
+          </h3>
+          {d?.role && (
+            <p className="text-center text-teal-700 text-xs mt-0.5">{d.role}</p>
+          )}
+
+          {/* Rating & kinh nghiệm */}
+          <div className="mt-2 text-center">
+            {"rating" in d && (
+              <div className="flex justify-center items-center gap-1">
+                <StarRating rating={d.rating} />
                 <span className="text-xs text-gray-600">
-                  {d.yearsExperience} năm kinh nghiệm
+                  {Number(d.rating || 0).toFixed(1)}
+                  {d.reviewsCount ? ` (${d.reviewsCount})` : ""}
                 </span>
+              </div>
+            )}
+            {d?.yearsExperience != null && (
+              <div className="text-xs text-gray-600 mt-1">
+                <strong>Kinh nghiệm:</strong> {d.yearsExperience} năm
+              </div>
+            )}
+          </div>
+
+          {/* Giới tính */}
+          {d?.gender && (
+            <div className="mt-2 text-xs text-gray-600 text-center">
+              <strong>Giới tính:</strong> {d.gender}
+            </div>
+          )}
+
+          {/* Bio ngắn */}
+          {d?.bio && (
+            <p className="mt-3 line-clamp-2 text-sm text-gray-700 text-center">
+              {d.bio}
+            </p>
+          )}
+
+          {/* Labels: chuyên môn / phương pháp */}
+          {(specializations.length > 0 || modalities.length > 0) && (
+            <div className="mt-3 space-y-2">
+              {specializations.length > 0 && (
+                <div>
+                  <div className="text-[13px] text-gray-500 mb-1">
+                    <strong>Chuyên môn:</strong>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {specializations.map((s, i) => (
+                      <span
+                        key={`sp-${i}`}
+                        className="inline-block rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-700"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
-              {d?.pricePerWeek == null && (
-                <span className="text-xs font-medium text-emerald-700">
-                  {priceText}400k/tuần
-                </span>
+              {modalities.length > 0 && (
+                <div>
+                  <div className="text-[13px] text-gray-500 mb-1">
+                    <strong>Phương pháp trị liệu:</strong>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {modalities.map((m, i) => (
+                      <span
+                        key={`md-${i}`}
+                        className="inline-block rounded-full border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-700"
+                      >
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
+          )}
 
-            {(d?.specialization?.length || d?.modalities?.length) && (
-              <div className="mt-2">
-                <div className="text-[13px] text-gray-600 mb-1">
-                  Chuyên môn & phương pháp:
-                </div>
-                <div className="flex flex-wrap">
-                  {(d.specializations || []).map((s, i) => (
-                    <Badge key={`sp-${i}`}>{s}</Badge>
-                  ))}
-                  {(d.modalities || []).map((m, i) => (
-                    <Badge key={`md-${i}`}>{m}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {d?.languages?.length ? (
-              <div className="mt-2 text-[13px] text-gray-600">
-                Ngôn ngữ:{" "}
-                <span className="text-gray-800">{d.languages.join(", ")}</span>
-              </div>
-            ) : null}
-
-            {d?.gender && (
-              <div className="text-[13px] text-gray-600">
-                Giới tính: <span className="text-gray-800">{d.gender}</span>
-              </div>
-            )}
-
-            {d?.bio && (
-              <div className="mt-2 text-sm text-gray-700">{d.bio}</div>
-            )}
-
-            {topSlots.length > 0 && (
-              <div className="mt-3">
-                <div className="text-[13px] text-gray-600 mb-1">
-                  Lịch trống gần nhất:
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {topSlots.map((s, i) => (
-                    <span
-                      key={i}
-                      className="text-xs px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100"
-                    >
-                      {formatSlot(s)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Mở rộng chi tiết */}
-            {(d?.certificates?.length || d?.about) && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setOpen((v) => !v);
-                }}
-                className="mt-3 text-xs text-teal-700 hover:underline"
-              >
-                {open ? "Ẩn chi tiết ▲" : "Xem chi tiết ▼"}
-              </button>
-            )}
-
-            {open && (
-              <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-3">
-                {d?.about && (
-                  <div className="text-sm text-gray-700 mb-2">{d.about}</div>
-                )}
-                {d?.certificates?.length ? (
-                  <>
-                    <div className="text-[13px] text-gray-600">Chứng chỉ:</div>
-                    <ul className="list-disc list-inside text-sm text-gray-700">
-                      {d.certificates.map((c, i) => (
-                        <li key={i}>
-                          {/^https?:\/\//i.test(c) ? (
-                            <a
-                              className="text-teal-700 underline"
-                              href={c}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              {c}
-                            </a>
-                          ) : (
-                            c
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                ) : null}
-              </div>
+          {/* Footer: giá tiền */}
+          <div className="mt-4 flex items-center justify-end border-t pt-3">
+            {d?.pricePerWeek != null && (
+              <span className="text-sm font-semibold text-emerald-700">
+                {priceText}/tuần
+              </span>
             )}
           </div>
         </div>
@@ -524,10 +467,51 @@ export default function TestAndMatch() {
     );
   };
 
-  // -----------------------
-  // Screens
-  // -----------------------
+  // ---------- Hành động bước 2 & 3 ----------
+  const goStep2Back = () => {
+    // quay lại quizz, đưa con trỏ về câu cuối để người dùng dễ chỉnh
+    setStep(1);
+    setCur(Math.max(0, totalAll - 1));
+    window.scrollTo(0, 0);
+  };
 
+  const goStep2Next = () => {
+    if (doctors.length > 0 && !pickedDoctorId) {
+      alert("Vui lòng chọn một bác sĩ trước khi tiếp tục.");
+      return;
+    }
+    setStep(3);
+    window.scrollTo(0, 0);
+  };
+
+  const goStep3Back = () => {
+    setStep(2);
+    window.scrollTo(0, 0);
+  };
+
+  const submitFinal = async () => {
+    try {
+      const payload = {
+        tests: CODES.map((code) => ({ code, answers: answers[code] })),
+        doctorId: pickedDoctorId || null,
+      };
+      const res = await fetch("/api/screening/submit-choice", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Gửi xác nhận thất bại.");
+      alert("Đã gửi xác nhận lựa chọn bác sĩ thành công!");
+    } catch (e) {
+      alert(e.message || "Đã có lỗi xảy ra khi gửi xác nhận.");
+    }
+  };
+
+  // ---------- Render ----------
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-sky-50 to-teal-50">
@@ -551,222 +535,283 @@ export default function TestAndMatch() {
     );
   }
 
-  const phq = testsMap[CODES[0]];
-  const gad = testsMap[CODES[1]];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-sky-50 to-teal-50 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header + progress */}
+        {/* Header tối giản */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl sm:text-3xl font-bold text-teal-700">
             Bài test & ghép bác sĩ
           </h1>
-          <span className="text-sm text-gray-500">
-            Bước {step}/{totalSteps}
-          </span>
-        </div>
-        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-teal-500 transition-all"
-            style={{ width: `${progress}%` }}
-          />
+          <span className="text-sm text-gray-500">Bước {step}/3</span>
         </div>
 
-        {/* B1: PHQ-9 */}
-        {step === 1 && phq && <RadioMatrix test={phq} />}
+        {/* B1: Quizz gộp PHQ-9 + GAD-7 (mỗi đáp án 1 dòng, không radio/ABCD/chọn-style) */}
+        {step === 1 && <QuizCombined />}
 
-        {/* B2: GAD-7 */}
-        {step === 2 && gad && <RadioMatrix test={gad} />}
-
-        {/* B3: Danh sách bác sĩ từ backend (đã mở rộng thông tin) */}
-        {step === 3 && (
-          <Card>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">
-              Đề xuất bác sĩ từ hệ thống
-            </h3>
-            {matchLoading && (
-              <div className="text-teal-700">Đang lấy danh sách bác sĩ…</div>
-            )}
-            {matchError && <div className="text-red-600">{matchError}</div>}
-            {!matchLoading && !matchError && (
-              <>
-                {doctors.length === 0 ? (
-                  <div className="text-gray-700">
-                    Hiện chưa có đề xuất phù hợp. Bạn vẫn có thể tiếp tục và
-                    chúng tôi sẽ liên hệ sau.
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-sm text-gray-500 mb-4">
-                      Chọn một bác sĩ phù hợp từ danh sách dưới đây.
-                    </p>
-                    {/* Toolbar sắp xếp */}
-                    <div className="flex items-center justify-end gap-3 mb-3">
-                      <label className="text-sm text-gray-600">Sắp xếp:</label>
-                      <select
-                        className="text-sm border border-gray-300 rounded-lg px-2 py-1 bg-white"
-                        value={sortKey}
-                        onChange={(e) => setSortKey(e.target.value)}
-                      >
-                        <option value="best">Phù hợp nhất</option>
-                        <option value="rating">Đánh giá cao</option>
-                        <option value="experience">Kinh nghiệm cao</option>
-                        <option value="priceAsc">Giá ↑</option>
-                        <option value="priceDesc">Giá ↓</option>
-                        <option value="name">Tên A→Z</option>
-                      </select>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {sortedDoctors.map((d) => (
-                        <DoctorCard
-                          key={d._id}
-                          d={d}
-                          picked={pickedDoctorId === d._id}
-                          onPick={() => setPickedDoctorId(d._id)}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </Card>
-        )}
-
-        {/* B4: Review & Submit (hiển thị thêm thông tin bác sĩ đã chọn) */}
-        {step === 4 && (
-          <Card>
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">
-              Xem lại & xác nhận
-            </h3>
-            <div className="grid md:grid-cols-2 gap-4 text-sm">
-              {CODES.map((code) => {
-                const t = testsMap[code];
-                return (
-                  <div key={code} className="p-3 rounded-lg bg-white border">
-                    <div className="font-medium text-gray-800">{t.title}</div>
-                    <div className="mt-1">
-                      Số câu:{" "}
-                      <span className="font-semibold">
-                        {t.questions?.length || 0}
-                      </span>
-                    </div>
-                    <div className="mt-1">
-                      Điểm tạm tính:{" "}
-                      <span className="font-semibold">
-                        {computed[code]?.score ?? 0}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-
-              <div className="md:col-span-2">
-                <div className="font-medium text-gray-800 mb-2">
-                  Bác sĩ đã chọn:
-                </div>
-                <div>
-                  {pickedDoctorId
-                    ? (() => {
-                        const d = doctors.find((x) => x._id === pickedDoctorId);
-                        if (!d) return "—";
-                        return (
-                          <div className="flex gap-4 items-start">
-                            <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-100">
-                              {d?.photo ? (
-                                <img
-                                  src={d.photo}
-                                  alt={d.fullName}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : null}
-                            </div>
-                            <div className="space-y-1">
-                              <div className="font-semibold text-gray-900">
-                                {d.accountId.fullName}{" "}
-                                <span className="text-sm text-teal-700">
-                                  ({d.role})
-                                </span>
-                              </div>
-                              <div className="text-xs text-gray-600">
-                                {d.yearsExperience != null &&
-                                  `${d.yearsExperience} năm KN`}
-                                {d.pricePerWeek != null &&
-                                  ` • ${formatCurrencyVND(
-                                    d.pricePerWeek
-                                  )}/tuần`}
-                                {d.rating != null &&
-                                  ` • ${Number(d.rating).toFixed(1)}★${
-                                    d.reviewsCount ? `/${d.reviewsCount}` : ""
-                                  }`}
-                              </div>
-                              {(d?.specialization?.length ||
-                                d?.modalities?.length) && (
-                                <div className="flex flex-wrap">
-                                  {(d.specialization || []).map((s, i) => (
-                                    <Badge key={`r-sp-${i}`}>{s}</Badge>
-                                  ))}
-                                  {(d.modalities || []).map((m, i) => (
-                                    <Badge key={`r-md-${i}`}>{m}</Badge>
-                                  ))}
-                                </div>
-                              )}
-                              {d?.languages?.length ? (
-                                <div className="text-xs text-gray-600">
-                                  Ngôn ngữ: {d.languages.join(", ")}
-                                </div>
-                              ) : null}
-                              {d?.bio && (
-                                <div className="text-xs text-gray-700">
-                                  {d.bio}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()
-                    : doctors.length === 0
-                    ? "— (Chưa có đề xuất phù hợp)"
-                    : "— (chưa chọn)"}
+        {/* B2: Đề xuất bác sĩ — có Quay lại / Tiếp tục */}
+        {step === 2 && (
+          <>
+            <Card>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-xl font-semibold text-gray-800">
+                  Đề xuất bác sĩ từ hệ thống
+                </h3>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600">Sắp xếp:</label>
+                  <select
+                    className="text-sm border border-gray-300 rounded-lg px-2 py-1 bg-white"
+                    value={sortKey}
+                    onChange={(e) => setSortKey(e.target.value)}
+                  >
+                    <option value="best">Phù hợp nhất</option>
+                    <option value="rating">Đánh giá cao</option>
+                    <option value="experience">Kinh nghiệm cao</option>
+                    <option value="priceAsc">Giá ↑</option>
+                    <option value="priceDesc">Giá ↓</option>
+                    <option value="name">Tên A→Z</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="md:col-span-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
-                Lưu ý: Kết quả sàng lọc chỉ để tham khảo. Chẩn đoán & kế hoạch
-                điều trị do chuyên gia quyết định.
-              </div>
+              {matchLoading && (
+                <div className="text-teal-700 mt-2">
+                  Đang lấy danh sách bác sĩ…
+                </div>
+              )}
+              {matchError && (
+                <div className="text-red-600 mt-2">{matchError}</div>
+              )}
+
+              {!matchLoading && !matchError && (
+                <>
+                  {reason ? (
+                    <div className="text-gray-700 mb-4 mt-2">{reason}</div>
+                  ) : null}
+                  {doctors.length === 0 ? (
+                    <div className="text-gray-700">
+                      Hiện chưa có đề xuất phù hợp. Bạn có thể tiếp tục sang
+                      bước tiếp theo.
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {doctors
+                        .slice()
+                        .sort((a, b) => {
+                          switch (sortKey) {
+                            case "rating":
+                              return (b?.rating ?? 0) - (a?.rating ?? 0);
+                            case "experience":
+                              return (
+                                (b?.yearsExperience ?? 0) -
+                                (a?.yearsExperience ?? 0)
+                              );
+                            case "priceAsc":
+                              return (
+                                (a?.pricePerWeek ?? Infinity) -
+                                (b?.pricePerWeek ?? Infinity)
+                              );
+                            case "priceDesc":
+                              return (
+                                (b?.pricePerWeek ?? -Infinity) -
+                                (a?.pricePerWeek ?? -Infinity)
+                              );
+                            case "name": {
+                              const an =
+                                a?.accountId?.fullName || a?.fullName || "";
+                              const bn =
+                                b?.accountId?.fullName || b?.fullName || "";
+                              return an.localeCompare(bn, "vi");
+                            }
+                            default:
+                              return 0; // giữ thứ tự backend
+                          }
+                        })
+                        .map((d) => (
+                          <DoctorCard
+                            key={d._id}
+                            d={d}
+                            picked={pickedDoctorId?._id === d._id}
+                            onPick={() => setPickedDoctorId(d)}
+                          />
+                        ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </Card>
+
+            {/* Actions Bước 2 */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={goStep2Back}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                ← Quay lại
+              </button>
+              <button
+                onClick={goStep2Next}
+                className="px-5 py-2 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700"
+              >
+                Tiếp tục →
+              </button>
             </div>
-          </Card>
+          </>
         )}
 
-        {/* Actions */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={goBack}
-            disabled={step === 1}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            ← Quay lại
-          </button>
+        {/* B3: Review & Submit — có Quay lại / Tiếp tục (gửi) */}
+        {step === 3 && (
+          <>
+            <Card>
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">
+                Xem lại & xác nhận
+              </h3>
+              <div className="grid md:grid-cols-2 gap-4 text-sm">
+                {CODES.map((code) => {
+                  const t = testsMap[code];
+                  return (
+                    <div key={code} className="p-3 rounded-lg bg-white border">
+                      <div className="font-medium text-gray-800">
+                        {t.title || code}
+                      </div>
+                      <div className="mt-1">
+                        Số câu:{" "}
+                        <span className="font-semibold">
+                          {t.questions?.length || 0}
+                        </span>
+                      </div>
+                      <div className="mt-1">
+                        Điểm tạm tính:{" "}
+                        <span className="font-semibold">
+                          {computed[code]?.score ?? 0}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
 
-          {step < 4 ? (
-            <button
-              onClick={goNext}
-              className="px-5 py-2 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700"
-            >
-              Tiếp tục →
-            </button>
-          ) : (
-            <button
-              onClick={submitFinal}
-              className="px-5 py-2 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700"
-            >
-              Gửi xác nhận
-            </button>
-          )}
-        </div>
+                <div className="md:col-span-2">
+                  <div className="font-medium text-gray-800 mb-2">
+                    Bác sĩ đã chọn:
+                  </div>
+                  <div>
+                    {pickedDoctorId
+                      ? (() => {
+                          const d = doctors.find(
+                            (x) => x._id === pickedDoctorId._id
+                          );
+                          if (!d) return "—";
+                          return (
+                            <div className="flex gap-4 items-start">
+                              <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-100">
+                                {d?.avatar ? (
+                                  <img
+                                    src={d.avatar}
+                                    alt={d.fullName}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : null}
+                              </div>
+                              <div className="space-y-1">
+                                <div className="font-semibold text-gray-900">
+                                  {d.accountId.fullName}{" "}
+                                  <span className="text-sm text-teal-700">
+                                    ({d.role})
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                  {d.yearsExperience != null &&
+                                    `${d.yearsExperience} năm KN`}
+                                  {d.pricePerWeek != null &&
+                                    ` • ${formatCurrencyVND(
+                                      d.pricePerWeek
+                                    )}/tuần`}
+                                  {d.rating != null &&
+                                    ` • ${Number(d.rating).toFixed(1)}★${
+                                      d.reviewsCount ? `/${d.reviewsCount}` : ""
+                                    }`}
+                                </div>
+                                {(d?.specialization?.length ||
+                                  d?.modalities?.length) && (
+                                  <div className="flex flex-wrap">
+                                    {(d.specializations || []).map((s, i) => (
+                                      <Badge key={`r-sp-${i}`}>{s}</Badge>
+                                    ))}
+                                    {(d.modalities || []).map((m, i) => (
+                                      <Badge key={`r-md-${i}`}>{m}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+                                {d?.languages?.length ? (
+                                  <div className="text-xs text-gray-600">
+                                    Ngôn ngữ: {d.languages.join(", ")}
+                                  </div>
+                                ) : null}
+                                {d?.bio && (
+                                  <div className="text-xs text-gray-700">
+                                    {d.bio}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()
+                      : doctors.length === 0
+                      ? "— (Chưa có đề xuất phù hợp)"
+                      : "— (chưa chọn)"}
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+                  Lưu ý: Kết quả sàng lọc chỉ để tham khảo. Chẩn đoán & kế hoạch
+                  điều trị do chuyên gia quyết định.
+                </div>
+              </div>
+            </Card>
+
+            {/* Actions Bước 3 */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={goStep3Back}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                ← Quay lại
+              </button>
+              <button
+                onClick={() => {
+                  setOpen(true);
+                  setOrderCode(generateTransactionCode());
+                }}
+                className="px-5 py-2 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700"
+              >
+                Tiếp tục →
+              </button>
+            </div>
+            <PaymentModal
+              open={open}
+              onClose={() => setOpen(false)}
+              onConfirmed={async () => {
+                // setOpen(false);
+                try {
+                  const { data } = await axiosInstance.get(
+                    API_PATHS.TRANSACTIONS.GET_TRANSACTION_BY_CODE(orderCode)
+                  );
+                  if (data.success) {
+                    toast.success("Thanh toan thanh cong");
+                    navigate("/user");
+                  } else {
+                    toast.error(data.message);
+                  }
+                } catch (err) {
+                  console.error(err.message);
+                }
+                // TODO: gọi API xác nhận, refresh trạng thái đơn hàng, v.v.
+              }}
+              amount={10000}
+              orderCode={orderCode}
+            />
+          </>
+        )}
       </div>
     </div>
   );

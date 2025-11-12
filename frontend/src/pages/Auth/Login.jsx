@@ -3,7 +3,7 @@ import { EyeIcon, EyeOffIcon } from "lucide-react"; // 👁️ Gói icon hiện 
 import { useApi } from "../../providers/Api";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import axiosInstance from "../../utils/axiosIntence";
+import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
 
 export default function Login() {
@@ -25,7 +25,7 @@ export default function Login() {
     }
     try {
       setLoading(true);
-
+      localStorage.clear();
       const res = await axiosInstance.post(API_PATHS.AUTH.LOGIN, {
         email,
         password,
@@ -33,12 +33,13 @@ export default function Login() {
 
       const data = res.data;
       // 🔹 Lưu token
-      if (data.token) localStorage.setItem("token", data.token);
-      if (data.account) localStorage.setItem("account", data.account);
+
+      if (data.token) localStorage.setItem("accessToken", data.token);
+      if (data.account)
+        localStorage.setItem("account", JSON.stringify(data.account));
 
       const response = await axiosInstance.get(API_PATHS.AUTH.GET_PROFILE);
       const userData = response.data.user;
-
       const role = data.account.role || "";
       if (role === "user") {
         if (userData.testHistory.length > 0) {
@@ -60,8 +61,11 @@ export default function Login() {
       }
       toast.success("Đăng nhập thành công!");
     } catch (err) {
-      console.error("❌ Lỗi đăng nhập:", err.message);
-      setError(err.message || "Đăng nhập thất bại!");
+      const errorMessage =
+        err.response?.data?.message || err.message || "Đăng nhập thất bại!";
+
+      setError(errorMessage);
+      console.error("❌ Lỗi đăng nhập:", errorMessage);
     } finally {
       setLoading(false);
     }
