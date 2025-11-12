@@ -30,7 +30,7 @@ connectDB();
 app.use(express.json());
 //Routes
 app.get("/", (req, res) => {
-  res.send("Hello World!");
+  res.send("Hello World! Welcome to Backend");
 });
 
 app.use("/api/users", userRoutes);
@@ -46,9 +46,7 @@ app.use("/api/transactions", transactionRoutes);
 //Start Server
 const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port: ${PORT} `);
-});
+export default app;
 
 // server.js
 // const express = require("express");
