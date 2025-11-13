@@ -24,14 +24,7 @@ app.use(
   })
 );
 // Connect Database
-(async () => {
-  try {
-    await connectDB();
-    console.log("✅ MongoDB connected successfully");
-  } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
-  }
-})();
+connectDB();
 
 // Middleware
 app.use(express.json());
@@ -53,7 +46,9 @@ app.use("/api/transactions", transactionRoutes);
 //Start Server
 const PORT = process.env.PORT || 8080;
 
-export default app;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port: ${PORT} `);
+});
 
 // server.js
 // const express = require("express");
