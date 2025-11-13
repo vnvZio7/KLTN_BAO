@@ -24,4 +24,4 @@ const testSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model("Test", testSchema);
+export default mongoose.model("Test", testSchema);

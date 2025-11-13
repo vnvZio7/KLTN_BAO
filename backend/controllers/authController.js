@@ -1,13 +1,13 @@
 // src/controllers/accountController.js
-import { generateToken } from "../config/jwt";
+import { generateToken } from "../config/jwt.js";
 
-import Account from "../models/account.model";
-import Doctor from "../models/doctor.model";
-import User from "../models/user.model";
+import Account from "../models/account.model.js";
+import Doctor from "../models/doctor.model.js";
+import User from "../models/user.model.js";
 import {
   uploadBufferToCloudinary,
   uploadManyBuffers,
-} from "../utils/uploadCloudinary";
+} from "../utils/uploadCloudinary.js";
 
 const registerUser = async (req, res) => {
   try {

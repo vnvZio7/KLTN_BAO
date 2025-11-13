@@ -38,8 +38,7 @@ function trimDoctorForPrompt(d) {
 }
 
 // services/testMaxScore.js
-const Test = require("../models/test.model");
-
+import Test from "../models/test.model.js";
 /** Trả map { [code]: maxScore } cho các code yêu cầu */
 async function getTestsMaxScores(codes = []) {
   if (!codes.length) return {};

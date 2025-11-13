@@ -1,4 +1,4 @@
-import User from "../models/user.model";
+import User from "../models/user.model.js";
 // @desc    Get all users (Admin only)
 // @route   GET /api/users/
 // @access  Private (Admin)

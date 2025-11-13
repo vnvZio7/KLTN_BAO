@@ -34,4 +34,4 @@ const doctorSchema = new mongoose.Schema({
 });
 doctorSchema.index({ specializations: 1, modalities: 1, pricePerWeek: 1 });
 
-module.exports = mongoose.model("Doctor", doctorSchema);
+export default mongoose.model("Doctor", doctorSchema);

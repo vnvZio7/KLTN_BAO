@@ -1,5 +1,5 @@
 import axios from "axios";
-import Transaction from "../models/transaction.model";
+import Transaction from "../models/transaction.model.js";
 const getDataSePay = async (req, res) => {
   try {
     const { data } = await axios.get(
@@ -35,7 +35,4 @@ const webhooks = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-module.exports = {
-  getDataSePay,
-  webhooks,
-};
+export { getDataSePay, webhooks };

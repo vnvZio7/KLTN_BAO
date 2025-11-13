@@ -1,8 +1,9 @@
 // services/doctorMatcherAIFromList.js
-const Groq = require("groq-sdk");
-const Doctor = require("../models/doctor.model");
-const { getTestsMaxScores } = require("./helper");
-require("dotenv").config();
+import Groq from "groq-sdk";
+import Doctor from "../models/doctor.model.js";
+import { getTestsMaxScores } from "./helper.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 

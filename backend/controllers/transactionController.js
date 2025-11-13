@@ -1,5 +1,5 @@
 import { success } from "zod";
-import Transaction from "../models/transaction.model";
+import Transaction from "../models/transaction.model.js";
 // @desc    Get all transactions (Admin only)
 // @route   GET /api/transactions/
 // @access  Private (Admin)

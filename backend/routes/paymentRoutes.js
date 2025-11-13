@@ -1,5 +1,5 @@
 import express from "express";
-import { getDataSePay, webhooks } from "../controllers/paymentController";
+import { getDataSePay, webhooks } from "../controllers/paymentController.js";
 
 const router = express.Router();
 

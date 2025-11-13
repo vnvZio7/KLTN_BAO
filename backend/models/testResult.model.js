@@ -12,4 +12,4 @@ const testResultSchema = new mongoose.Schema({
 });
 testResultSchema.index({ patientId: 1, takenAt: -1 });
 
-module.exports = mongoose.model("TestResult", testResultSchema);
+export default mongoose.model("TestResult", testResultSchema);

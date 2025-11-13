@@ -1,10 +1,10 @@
 import express from "express";
-import { adminOnly, protect } from "../middlewares/authMiddleware";
+import { adminOnly, protect } from "../middlewares/authMiddleware.js";
 import {
   getExerciseTemplates,
   getExerciseTemplateById,
   createExerciseTemplate,
-} from "../controllers/exerciseTemplateController";
+} from "../controllers/exerciseTemplateController.js";
 
 const router = express.Router();
 
