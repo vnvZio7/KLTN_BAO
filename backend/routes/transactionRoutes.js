@@ -1,9 +1,9 @@
 import express from "express";
-import { adminOnly, protect } from "../middlewares/authMiddleware";
+import { adminOnly, protect } from "../middlewares/authMiddleware.js";
 import {
   getTransactions,
   getTransactionByCode,
-} from "../controllers/transactionController";
+} from "../controllers/transactionController.js";
 
 const router = express.Router();
 

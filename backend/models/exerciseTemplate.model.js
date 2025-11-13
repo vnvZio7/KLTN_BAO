@@ -17,4 +17,4 @@ const exerciseTemplateSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("ExerciseTemplate", exerciseTemplateSchema);
+export default mongoose.model("ExerciseTemplate", exerciseTemplateSchema);

@@ -1,5 +1,5 @@
-import Test from "../models/test.model";
-import { gadBand, phqBand } from "../utils/helper";
+import Test from "../models/test.model.js";
+import { gadBand, phqBand } from "../utils/helper.js";
 
 const getTests = async (req, res) => {
   try {

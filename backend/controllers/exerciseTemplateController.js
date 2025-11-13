@@ -1,4 +1,4 @@
-import ExerciseTemplate from "../models/exerciseTemplate.model";
+import ExerciseTemplate from "../models/exerciseTemplate.model.js";
 
 const getExerciseTemplates = async (req, res) => {
   try {

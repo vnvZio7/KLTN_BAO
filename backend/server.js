@@ -1,20 +1,20 @@
-require("dotenv").config();
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
-import connectDB from "./config/db";
+import connectDB from "./config/db.js";
 
-import authRoutes from "./routes/authRoutes";
-import roomRoutes from "./routes/roomRoutes";
-import userRoutes from "./routes/userRoutes";
-import testRoutes from "./routes/testRoutes";
-import doctorRoutes from "./routes/doctorRoutes";
-import groqRoutes from "./routes/groqRoutes";
-import exerciseTemplateRoutes from "./routes/exerciseTemplateRoutes";
-import paymentRoutes from "./routes/paymentRoutes";
-import transactionRoutes from "./routes/transactionRoutes";
+import authRoutes from "./routes/authRoutes.js";
+import roomRoutes from "./routes/roomRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import testRoutes from "./routes/testRoutes.js";
+import doctorRoutes from "./routes/doctorRoutes.js";
+import groqRoutes from "./routes/groqRoutes.js";
+import exerciseTemplateRoutes from "./routes/exerciseTemplateRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+import transactionRoutes from "./routes/transactionRoutes.js";
 
 const app = express();
-
+dotenv.config();
 // Middleware to handle CORS
 app.use(
   cors({
@@ -24,7 +24,8 @@ app.use(
   })
 );
 // Connect Database
-connectDB();
+
+await connectDB();
 
 // Middleware
 app.use(express.json());

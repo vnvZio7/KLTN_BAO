@@ -1,5 +1,5 @@
 // utils/uploadCloudinary.js
-import cloudinary from "../config/cloudinary";
+import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 
 export const uploadBufferToCloudinary = (fileBuffer, folder = "certificates") =>
