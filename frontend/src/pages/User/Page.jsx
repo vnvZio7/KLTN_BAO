@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import Shell from "../../components/user/Shell";
 import SchedulePage from "./features/schedule/SchedulePage";
 import ChatPage from "./features/chat/ChatPage";
@@ -9,6 +9,7 @@ import UserStatsPage from "./features/stats/UserStatsPage";
 import DoctorInfoPage from "./features/doctor/DoctorInfoPage";
 import DoctorHomeworkPage from "./Homework";
 import PaymentPage from "./features/PaymentPage";
+import {  useUserContext } from "../../context/userContext";
 
 export default function Page() {
   const [active, setActive] = useState("stats");
@@ -16,16 +17,18 @@ export default function Page() {
   const [appointments, setAppointments] = useState([]);
   const [billing, setBilling] = useState(MOCK_BILLING);
 
-  const [user, setUser] = useState({
-    fullName: "Bao Nguyen",
-    email: "bao@example.com",
-    phone: "",
-    dob: "",
-    gender: "",
-    lang: "Việt",
-    bio: "",
-    avatar: "",
-  });
+  // const [user, setUser] = useState({
+  //   fullName: "Bao Nguyen",
+  //   email: "bao@example.com",
+  //   phone: "",
+  //   dob: "",
+  //   gender: "",
+  //   lang: "Việt",
+  //   bio: "",
+  //   avatar: "",
+  // });
+  const {user} = useUserContext();
+  console.log(user)
 
   const [notifications, setNotifications] = useState([
     {
@@ -131,7 +134,7 @@ export default function Page() {
           setNotifications={setNotifications}
         />
       )}
-      {active === "profile" && <ProfilePage user={user} setUser={setUser} />}
+      {active === "profile" && <ProfilePage user={user}/>}
     </Shell>
   );
 }

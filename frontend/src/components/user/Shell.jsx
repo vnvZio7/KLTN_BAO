@@ -20,6 +20,7 @@ export default function Shell({
     { key: "profile", label: "Thông tin cá nhân" },
     { key: "billing", label: "Thanh toán" },
   ];
+  console.log(user);
   const initials = (name = "U") =>
     name
       .split(" ")
@@ -47,25 +48,17 @@ export default function Shell({
           {/* Thông tin người dùng + menu hover Đăng xuất */}
           <div className="relative group inline-block">
             <div className="flex items-center gap-3 cursor-default select-none">
-              {user?.avatar ? (
-                <img
-                  src={user.avatar}
-                  alt={user.fullName}
-                  className="h-9 w-9 rounded-full object-cover"
-                />
-              ) : (
-                <div
-                  className="h-9 w-9 rounded-full bg-slate-800 text-white
+              <div
+                className="h-9 w-9 rounded-full bg-slate-800 text-white
                       grid place-content-center text-xs font-semibold"
-                >
-                  {initials(user?.fullName)}
-                </div>
-              )}
+              >
+                {initials(user?.accountId.fullName)}
+              </div>
               <div className="text-sm">
                 <div className="font-medium">
-                  {user?.fullName || "Người dùng"}
+                  {user?.accountId.fullName || "Người dùng"}
                 </div>
-                <div className="text-slate-600">{user?.email}</div>
+                <div className="text-slate-600">{user?.accountId.email}</div>
               </div>
             </div>
 

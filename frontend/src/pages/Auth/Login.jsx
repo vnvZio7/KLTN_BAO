@@ -42,11 +42,12 @@ export default function Login() {
       const userData = response.data.user;
       const role = data.account.role || "";
       if (role === "user") {
-        if (userData.testHistory.length > 0) {
+        // if (userData.testHistory.length > 0) {
+        //   navigate("/user");
+        // } else {
+        //   navigate("/test");
           navigate("/user");
-        } else {
-          navigate("/test");
-        }
+        // }
       } else if (role === "doctor") {
         if (userData.approval.status === "pending") {
           navigate("/pending");
