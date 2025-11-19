@@ -156,7 +156,8 @@ const loginUser = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-    res.json({ user: req.user });
+    const user = await User.findOne({_id:req.user._id}).populate("accountId").select("-password");
+    res.json({ user });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

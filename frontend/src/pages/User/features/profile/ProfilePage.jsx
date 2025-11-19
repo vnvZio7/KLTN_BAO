@@ -207,15 +207,15 @@ function PasswordModal({ open, onClose, onSubmit }) {
 }
 
 /* ---------- Trang chính ---------- */
-export default function ProfilePage({ user = {}, setUser }) {
+export default function ProfilePage({ user = {} }) {
   // Chỉ các trường trong schema:
   const init = useMemo(
     () => ({
-      fullName: user.fullName ?? "",
-      email: user.email ?? "",
-      phone: user.phone ?? "",
-      gender: user.gender ?? "",
-      birthDate: user.birthDate ? toDateInput(user.birthDate) : "",
+      fullName: user.accountId.fullName ?? "",
+      email: user.accountId.email ?? "",
+      phone: user.accountId.phone ?? "",
+      gender: user.accountId.gender ?? "",
+      birthDate: user.accountId.birthDate ? toDateInput(user.accountId.birthDate) : "",
     }),
     [user]
   );
@@ -225,6 +225,10 @@ export default function ProfilePage({ user = {}, setUser }) {
   const [errors, setErrors] = useState([]);
   const [pwOpen, setPwOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  const setUser = (user)=>{
+
+  }
 
   // đồng bộ khi prop user đổi (nếu đang không chỉnh)
   useEffect(() => {
