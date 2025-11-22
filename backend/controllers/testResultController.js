@@ -9,29 +9,30 @@ const getTestResults = async (req, res) => {
   }
 };
 
-const getTestResultById = async (req, res) => {
-  try {
-    const testResult = await TestResult.findById(req.params.id);
-    if (!testResult)
-      return res.status(404).json({ message: "Không tìm thấy bài testResult" });
-    res.json(testResult);
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
+const getTestResultByCode = async (req, res) => {
+  // try {
+  //   const testResult = await TestResult.findById(req.params.id);
+  //   if (!testResult)
+  //     return res.status(404).json({ message: "Không tìm thấy bài testResult" });
+  //   res.json(testResult);
+  // } catch (error) {
+  //   res.status(500).json({ message: "Server error", error: error.message });
+  // }
 };
 
 const createTestResult = async (req, res) => {
   try {
-    const { code, title, description, questions } = req.body;
+    const { code, answers, totalScore, band } = req.body;
     const testResult = await TestResult.create({
+      userId: req.user._id,
       code,
-      title,
-      description,
-      questions,
+      answers,
+      totalScore,
+      band,
     });
     res
       .status(201)
-      .json({ message: "Đã tạo bài testResult thành công!", testResult });
+      .json({ message: "Đã tạo testResult thành công!", testResult });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

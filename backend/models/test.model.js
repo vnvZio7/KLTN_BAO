@@ -11,16 +11,7 @@ const testSchema = new mongoose.Schema({
       scores: [Number], // điểm tương ứng với mỗi lựa chọn
     },
   ],
-  scoring: {
-    // ngưỡng severity (tuỳ test)
-    thresholds: [
-      {
-        min: Number,
-        max: Number,
-        label: String, // ví dụ PHQ-9: none/mild/moderate/moderately_severe/severe
-      },
-    ],
-  },
+  maxScrore: Number,
   createdAt: { type: Date, default: Date.now },
 });
 

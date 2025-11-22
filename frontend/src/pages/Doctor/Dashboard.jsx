@@ -1,21 +1,19 @@
-// src/views/Dashboard.jsx
 import React, { useMemo } from "react";
-import {
-  CalendarDays,
-  CalendarClock,
-  MessageSquareText,
-  PhoneCall,
-  Users,
-  Activity,
-} from "lucide-react";
 import IconBtn from "../../components/doctor/IconBtn";
 import Badge from "../../components/doctor/Badge";
 import Empty from "../../components/doctor/Empty";
 import Avatar from "../../components/doctor/Avatar";
 import Progress from "../../components/doctor/Progress";
 import { fmtDateTime, fmtTime } from "../../lib/date";
-import { nameOf } from "../../lib/utils";
 import { classifyPHQ9, classifyGAD7, toneToClass } from "../../lib/tests";
+import {
+  Users,
+  MessageSquareText,
+  PhoneCall,
+  CalendarDays,
+  ClipboardList,
+  Activity,
+} from "lucide-react";
 
 export default function Dashboard({
   stats,
@@ -27,7 +25,7 @@ export default function Dashboard({
   const upcoming = useMemo(
     () =>
       calls
-        .slice()
+        ?.slice()
         .sort((a, b) => +new Date(a.time) - +new Date(b.time))
         .slice(0, 6),
     [calls]
@@ -53,18 +51,19 @@ export default function Dashboard({
 
   return (
     <div className="space-y-5">
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <StatCard
           icon={Users}
           label="Bệnh nhân"
           value={stats.total}
-          hint="Tổng đang theo dõi"
+          hint="Tổng"
         />
         <StatCard
           icon={MessageSquareText}
           label="Chat hoạt động"
           value={stats.activeChats}
-          hint="Có tin nhắn chưa đọc"
+          hint="Có tin chưa đọc"
         />
         <StatCard
           icon={PhoneCall}
@@ -73,20 +72,22 @@ export default function Dashboard({
           hint="Trong 24h"
         />
         <StatCard
-          icon={CalendarClock}
+          icon={CalendarDays}
           label="Yêu cầu chờ"
           value={stats.pendingReq}
           hint="Chưa xử lý"
         />
         <StatCard
-          icon={CalendarDays}
+          icon={ClipboardList}
           label="Bài tập đến hạn"
           value={stats.homeworkDueToday}
           hint="Hôm nay"
         />
       </div>
 
+      {/* 3 columns */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Upcoming calls */}
         <div className="rounded-2xl border bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Cuộc gọi sắp tới</h3>
@@ -99,7 +100,7 @@ export default function Dashboard({
               <Empty
                 icon={PhoneCall}
                 title="Chưa có lịch"
-                hint="Tạo lịch mới ở mục Lịch gọi"
+                hint="Tạo lịch ở mục Lịch gọi"
               />
             )}
             {upcoming.map((c) => (
@@ -107,23 +108,22 @@ export default function Dashboard({
                 key={c.id}
                 className="flex items-center gap-3 rounded-xl border p-3"
               >
-                <Avatar name={nameOf(patients, c.patientId)} />
+                <Avatar name={c.patientName} />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium">
-                    {nameOf(patients, c.patientId)}
+                    {c.patientName}
                   </div>
                   <div className="text-xs text-zinc-500">
                     {fmtDateTime(c.time)} • 45 phút
                   </div>
                 </div>
-                <div className="ml-auto">
-                  <IconBtn> Bắt đầu </IconBtn>
-                </div>
+                <IconBtn icon={PhoneCall}>Bắt đầu</IconBtn>
               </div>
             ))}
           </div>
         </div>
 
+        {/* Recent messages */}
         <div className="rounded-2xl border bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Tin nhắn gần đây</h3>
@@ -131,9 +131,10 @@ export default function Dashboard({
               icon={MessageSquareText}
               onClick={() => setNav("messages")}
             >
-              Vào hộp chat
+              Vào chat
             </IconBtn>
           </div>
+
           <div className="space-y-3">
             {recentMsgs.length === 0 && (
               <Empty icon={MessageSquareText} title="Chưa có tin nhắn" />
@@ -163,15 +164,18 @@ export default function Dashboard({
           </div>
         </div>
 
+        {/* Risk patients */}
         <div className="rounded-2xl border bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Cảnh báo nguy cơ</h3>
             <Badge tone="danger">Theo dõi sát</Badge>
           </div>
+
           <div className="space-y-3">
             {riskPatients.length === 0 && (
               <Empty icon={Activity} title="Không có ca nguy cơ" />
             )}
+
             {riskPatients.map((p) => (
               <div key={p.id} className="rounded-xl border p-3">
                 <div className="flex items-center gap-3">
@@ -183,6 +187,7 @@ export default function Dashboard({
                     </div>
                   </div>
                 </div>
+
                 <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <Progress

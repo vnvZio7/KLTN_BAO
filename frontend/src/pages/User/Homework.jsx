@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect, Activity } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play,
@@ -14,6 +14,16 @@ import {
   PartyPopper,
   Timer as IconTimer,
   Dot,
+  ActivitySquare,
+  UsersRound,
+  Lightbulb,
+  Heart,
+  Puzzle,
+  Layers,
+  Scale,
+  Users,
+  Focus,
+  Leaf,
 } from "lucide-react";
 
 /**
@@ -105,32 +115,103 @@ function Chip({ children, className = "" }) {
   );
 }
 
-const methodTheme = {
+export const methodTheme = {
   CBT: {
     ring: "from-fuchsia-400 to-pink-400",
     text: "text-fuchsia-700",
     Icon: Brain,
   },
+
+  "Behavioral Activation": {
+    ring: "from-amber-400 to-orange-400",
+    text: "text-amber-700",
+    Icon: Activity,
+  },
+
+  ACT: {
+    ring: "from-green-400 to-emerald-400",
+    text: "text-green-700",
+    Icon: Leaf,
+  },
+
+  MBCT: {
+    ring: "from-indigo-400 to-blue-400",
+    text: "text-indigo-700",
+    Icon: Focus,
+  },
+
   Mindfulness: {
     ring: "from-teal-400 to-emerald-400",
     text: "text-teal-700",
     Icon: Wind,
   },
-  Relaxation: {
-    ring: "from-indigo-400 to-cyan-400",
-    text: "text-indigo-700",
-    Icon: Music2,
-  },
+
   Exposure: {
     ring: "from-orange-400 to-rose-400",
     text: "text-orange-700",
     Icon: Target,
   },
+
+  "Interpersonal (IPT)": {
+    ring: "from-rose-400 to-pink-400",
+    text: "text-rose-700",
+    Icon: Users,
+  },
+
+  DBT: {
+    ring: "from-violet-400 to-purple-400",
+    text: "text-violet-700",
+    Icon: Scale,
+  },
+
+  Schema: {
+    ring: "from-yellow-400 to-amber-400",
+    text: "text-yellow-700",
+    Icon: Layers,
+  },
+
+  Psychodynamic: {
+    ring: "from-slate-500 to-blue-500",
+    text: "text-slate-700",
+    Icon: Puzzle,
+  },
+
+  "Emotion-Focused (EFT)": {
+    ring: "from-rose-400 to-red-400",
+    text: "text-rose-700",
+    Icon: Heart,
+  },
+
+  "Solution-Focused (SFBT)": {
+    ring: "from-cyan-400 to-sky-400",
+    text: "text-cyan-700",
+    Icon: Lightbulb,
+  },
+
+  Family: {
+    ring: "from-teal-400 to-sky-400",
+    text: "text-teal-700",
+    Icon: UsersRound,
+  },
+
+  "Biofeedback / Neurofeedback": {
+    ring: "from-lime-400 to-green-400",
+    text: "text-lime-700",
+    Icon: ActivitySquare,
+  },
+
+  Relaxation: {
+    ring: "from-indigo-400 to-cyan-400",
+    text: "text-indigo-700",
+    Icon: Music2,
+  },
 };
 function MethodPill({ method }) {
+  console.log(method);
   if (!method) return null;
   const theme = methodTheme[method] || methodTheme.Relaxation;
   const Icon = theme.Icon || Target;
+  console.log(theme, Icon);
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${theme.text} border-slate-200 bg-white`}
@@ -141,23 +222,19 @@ function MethodPill({ method }) {
 }
 
 // ====== Chuẩn hoá Assignment -> Item UI ======
-function normalizeAssignments(assignments = [], templatesMap = {}) {
-  return assignments.map((a, idx) => {
-    const tpl = a.templateId ? templatesMap[a.templateId] : null;
-    const base = tpl || {};
+function normalizeAssignments(assignments) {
+  return assignments.map((base) => {
     return {
-      id: a._id || `as-${idx}-${base.title || a.title || "custom"}`,
-      title: a.title || base.title,
-      content: a.content || base.content,
+      id: base._id,
+      title: base.title,
+      content: base.content,
       method: base.method,
       estimatedMinutes: base.estimatedMinutes || 10,
       attachments: base.attachments || [],
-      difficulty: a.difficulty || base.difficulty || "easy",
-      frequency: a.frequency || "daily",
-      due: a.dueDate
-        ? new Date(a.dueDate).toISOString()
-        : prettyDue(3 + (idx % 3)),
-      doctorId: a.doctorId,
+      difficulty: base.difficulty,
+      frequency: base.frequency,
+      due: base.dueDate && new Date(base.dueDate).toISOString(),
+      doctorId: base.doctorId,
       submissions: [], // client demo
     };
   });
@@ -206,7 +283,7 @@ function Confetti({ show, onDone }) {
     <div className="pointer-events-none fixed inset-0 z-[60] overflow-hidden">
       {pieces.map((p) => (
         <motion.div
-          key={p.id}
+          key={p._id}
           initial={{ opacity: 0, y: -20, x: `${p.x}vw`, rotate: 0 }}
           animate={{ opacity: 1, y: 320, rotate: p.r }}
           transition={{ duration: p.d, delay: p.delay, ease: "easeOut" }}
@@ -331,7 +408,7 @@ function AssignmentModal({ open, onClose, item, onSubmit }) {
           {/* Info header: chỉ hiển thị thời gian & hạn + frequency */}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
             <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-medium text-slate-700 border-slate-200 bg-slate-50">
-              <IconTimer size={14} /> Gợi ý: {item.estimatedMinutes} phút
+              <IconTimer size={14} /> Thời gian: {item.estimatedMinutes} phút
             </span>
             <span
               className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-medium ${dueCls}`}
@@ -490,7 +567,7 @@ function AssignmentModal({ open, onClose, item, onSubmit }) {
                       answers = { text: answersText };
                     }
                     const payload = {
-                      assignmentId: item.id,
+                      assignmentId: item._id,
                       userId: "u1", // demo
                       answers,
                       attachments: files.map((f) => f.name),
@@ -519,6 +596,7 @@ export default function UserHomeworkPage({
   templatesMap = TEMPLATES_MAP,
 }) {
   // Demo 3 assignment nếu không truyền props
+  console.log(assignments);
   const demoAssignments = [
     {
       _id: "as1",
@@ -550,14 +628,11 @@ export default function UserHomeworkPage({
   ];
 
   const seed = useMemo(
-    () =>
-      assignments?.length
-        ? normalizeAssignments(assignments, templatesMap)
-        : normalizeAssignments(demoAssignments, templatesMap),
-    [assignments, templatesMap]
+    () => assignments?.length && normalizeAssignments(assignments),
+    [assignments]
   );
-
-  const [items, setItems] = useState(seed);
+  console.log(seed);
+  const [items, setItems] = useState(seed || []);
   const [active, setActive] = useState(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [freqFilter, setFreqFilter] = useState("all"); // all | once | daily | weekly
@@ -583,7 +658,7 @@ export default function UserHomeworkPage({
   const handleSubmit = (submission) => {
     setItems((prev) =>
       prev.map((it) =>
-        it.id === submission.assignmentId
+        it._id === submission.assignmentId
           ? {
               ...it,
               submissions: [
@@ -616,8 +691,7 @@ export default function UserHomeworkPage({
               Bài tập của bạn
             </h1>
             <p className="mt-2 max-w-2xl text-slate-700">
-              Trạng thái rút gọn: <b>Chưa nộp</b> / <b>Đã nộp</b>. Nhấn "Bắt
-              đầu" để trả lời và nộp bài.
+              Nhấn "<b>Bắt đầu</b>" để trả lời và nộp bài.
             </p>
 
             <div className="mt-4 grid grid-cols-3 gap-3">
@@ -690,6 +764,9 @@ export default function UserHomeworkPage({
       {/* Assigned list (CHỈ hiển thị thời gian, và trạng thái rút gọn) */}
       <section className="grid gap-4 md:grid-cols-2">
         {filteredItems.map((it, idx) => {
+          {
+            /* console.log(it); */
+          }
           const theme = methodTheme[it.method] || methodTheme.Relaxation;
           const isSubmitted = (it.submissions?.length || 0) > 0;
           const left = daysLeft(it.due);
@@ -763,7 +840,8 @@ export default function UserHomeworkPage({
                 {/* CHỈ hiển thị thông tin thời gian */}
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
                   <div className="flex items-center gap-1">
-                    <IconTimer size={14} /> Gợi ý: {it.estimatedMinutes} phút
+                    <IconTimer size={14} /> Thời gian: {it.estimatedMinutes}{" "}
+                    phút
                   </div>
                   <div className="flex items-center gap-1 justify-end">
                     Hạn: <b>{prettyDate(it.due)}</b>

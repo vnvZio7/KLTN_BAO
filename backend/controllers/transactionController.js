@@ -5,8 +5,19 @@ import Transaction from "../models/transaction.model.js";
 // @access  Private (Admin)
 const getTransactions = async (req, res) => {
   try {
-    const transactions = await Transaction.find();
-    res.json(transactions);
+    const transactions = await Transaction.find({ userId: req.user._id })
+      .populate({
+        path: "doctorId",
+        populate: {
+          path: "accountId",
+          model: "Account",
+          select: "-password",
+        },
+      })
+      .sort({
+        createdAt: -1,
+      });
+    res.json({ transactions });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -29,4 +40,30 @@ const getTransactionByCode = async (req, res) => {
   }
 };
 
-export { getTransactions, getTransactionByCode };
+const updateTransactions = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const updated = await Transaction.findByIdAndUpdate(
+      id,
+      { $set: { roomId: req.body.roomId } },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: "Transaction không tồn tại" });
+    }
+
+    res.json({
+      message: "Cập nhật thành công",
+      transaction: updated,
+    });
+  } catch (err) {
+    console.error("updateTransaction error:", err);
+    return res.status(500).json({
+      message: "Lỗi server khi cập nhật transaction",
+      error: err.message,
+    });
+  }
+};
+export { getTransactions, getTransactionByCode, updateTransactions };

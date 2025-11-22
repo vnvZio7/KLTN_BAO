@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
+import { useUserContext } from "../../context/userContext";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -12,6 +13,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { setToken } = useUserContext();
 
   const navigate = useNavigate();
 
@@ -35,27 +37,31 @@ export default function Login() {
       // 🔹 Lưu token
 
       if (data.token) localStorage.setItem("accessToken", data.token);
+      setToken(data.token);
       if (data.account)
         localStorage.setItem("account", JSON.stringify(data.account));
-
+      const role = data.account.role || "";
+      if (role === "admin") {
+        navigate("/admin-test");
+        return;
+      }
       const response = await axiosInstance.get(API_PATHS.AUTH.GET_PROFILE);
       const userData = response.data.user;
-      const role = data.account.role || "";
+      console.log(response);
       if (role === "user") {
-        // if (userData.testHistory.length > 0) {
-        //   navigate("/user");
-        // } else {
-        //   navigate("/test");
+        if (userData.testHistory.length > 0) {
           navigate("/user");
-        // }
+        } else {
+          navigate("/test");
+        }
+        // navigate("/user");
       } else if (role === "doctor") {
+        console.log(userData.approval);
         if (userData.approval.status === "pending") {
           navigate("/pending");
         } else {
           navigate("/doctor");
         }
-      } else if (role === "admin") {
-        navigate("/admin/dashboard");
       } else {
         navigate("/");
         return;

@@ -1,5 +1,8 @@
 // DemoDoctorAppointmentsOnly.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useUserContext } from "../../../../context/userContext";
+import axiosInstance from "../../../../utils/axiosInstance";
+import { API_PATHS } from "../../../../utils/apiPaths";
 
 /** Utils: format ISO datetime to Vietnamese readable string */
 function prettyTime(iso) {
@@ -21,18 +24,12 @@ function prettyTime(iso) {
  * - Nếu status = "upcoming" → hiện nút "Vào phòng"
  * - Nếu status = "completed"/"complete" → hiện nút "Xem lại"
  */
-function SchedulePage({
+export default function SchedulePage({
   doctor,
   appointments,
   onJoinRoom, // callback khi bấm "Vào phòng"
   onReview, // callback khi bấm "Xem lại" (replay/notes)
 }) {
-  // Chỉ các lịch thuộc bác sĩ này, sắp xếp tăng dần theo thời gian
-  const doctorAppointments = useMemo(() => {
-    const list = (appointments || []).filter((a) => a.doctorId === doctor?.id);
-    return list.sort((a, b) => new Date(a.time) - new Date(b.time));
-  }, [appointments, doctor]);
-
   const joinRoom = (appt) => {
     onJoinRoom?.(appt);
     if (!onJoinRoom) alert("Đi vào phòng gọi… (TODO: kết nối WebRTC)");
@@ -47,20 +44,20 @@ function SchedulePage({
     <div className="space-y-6">
       <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <h3 className="text-lg font-semibold mb-1">
-          Lịch đã đặt với {doctor?.name || "bác sĩ"}
+          Lịch đã đặt với {doctor?.accountId.fullName || "bác sĩ"}
         </h3>
         <p className="text-slate-600 mb-4">
           Hệ thống sẽ nhắc trước 15 phút. Mỗi lịch kéo dài <b>45 phút</b>.
         </p>
 
         <div className="divide-y">
-          {doctorAppointments.length === 0 && (
+          {appointments.length === 0 && (
             <div className="text-slate-500">
-              Chưa có lịch hẹn nào với {doctor?.name || "bác sĩ"}.
+              Chưa có lịch hẹn nào với {doctor?.accountId.fullName || "bác sĩ"}.
             </div>
           )}
 
-          {doctorAppointments.map((a) => {
+          {appointments.map((a) => {
             const isUpcoming = a.status === "upcoming";
             const isCompleted =
               a.status === "completed" || a.status === "complete";
@@ -125,59 +122,23 @@ function SchedulePage({
 }
 
 /* --------------------------- DATA MẪU --------------------------- */
-const SAMPLE_DOCTOR = {
-  id: "d001",
-  name: "TS.BS. Nguyễn An",
-};
-
-const SAMPLE_APPOINTMENTS = [
-  {
-    id: "apt_01",
-    doctorId: "d001",
-    doctorName: "TS.BS. Nguyễn An",
-    time: "2025-11-13T09:00:00+07:00",
-    durationMinutes: 45,
-    status: "upcoming",
-    reason: "Mất ngủ 3 ngày gần đây",
-  },
-  {
-    id: "apt_02",
-    doctorId: "d001",
-    doctorName: "TS.BS. Nguyễn An",
-    time: "2025-11-15T14:30:00+07:00",
-    durationMinutes: 45,
-    status: "upcoming",
-    reason: "Căng thẳng công việc",
-  },
-  {
-    id: "apt_03",
-    doctorId: "d001",
-    doctorName: "TS.BS. Nguyễn An",
-    time: "2025-11-16T10:15:00+07:00",
-    durationMinutes: 45,
-    status: "completed",
-    reason: "Lo âu khi thuyết trình",
-  },
-];
 
 /* --------------------------- DEMO WRAPPER --------------------------- */
-export default function DemoDoctorAppointmentsOnly() {
-  const [appointments] = useState(SAMPLE_APPOINTMENTS);
-
-  return (
-    <div className="p-6 bg-slate-50 min-h-screen">
-      <SchedulePage
-        doctor={SAMPLE_DOCTOR}
-        appointments={appointments}
-        onJoinRoom={(appt) => {
-          console.log("Join room:", appt);
-          alert(`Vào phòng: ${appt.id}`);
-        }}
-        onReview={(appt) => {
-          console.log("Review appointment:", appt);
-          alert(`Xem lại: ${appt.id}`);
-        }}
-      />
-    </div>
-  );
-}
+// export default function DemoDoctorAppointmentsOnly() {
+//   return (
+//     <div className="p-6 bg-slate-50 min-h-screen">
+//       <SchedulePage
+//         // doctor={}
+//         // appointments={appointments}
+//         onJoinRoom={(appt) => {
+//           console.log("Join room:", appt);
+//           alert(`Vào phòng: ${appt.id}`);
+//         }}
+//         onReview={(appt) => {
+//           console.log("Review appointment:", appt);
+//           alert(`Xem lại: ${appt.id}`);
+//         }}
+//       />
+//     </div>
+//   );
+// }

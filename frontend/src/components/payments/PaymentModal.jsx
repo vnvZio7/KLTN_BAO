@@ -1,8 +1,7 @@
 // src/components/payments/PaymentModal.jsx
 import React, { useEffect, useState } from "react";
 import { X, Copy, CheckCircle, ShieldCheck } from "lucide-react";
-import axiosInstance from "../../utils/axiosInstance";
-import { API_PATHS } from "../../utils/apiPaths";
+import { useApi } from "../../providers/Api";
 
 export default function PaymentModal({
   open,
@@ -12,25 +11,11 @@ export default function PaymentModal({
   orderCode, // mã/ghi chú chuyển khoản (e.g. "POMERA-123456")
   message = "Vui lòng thanh toán trước khi kết nối với bác sĩ.",
 }) {
-  const [bank, setBank] = useState([]);
+  const { bank } = useApi();
   const sepayQrUrl = `${
     import.meta.env.VITE_QR_CODE_SEPAY
   }amount=${amount}&des=${orderCode}`;
   useEffect(() => {
-    const getSepay = async () => {
-      const res = await axiosInstance.get(API_PATHS.PAYMENT.GET_SEPAY);
-      console.log();
-      const data = res.data.bankaccount;
-      const bankdata = {
-        bankName: data.bank_short_name,
-        accountName: data.account_holder_name,
-        accountNumber: data.account_number,
-      };
-      setBank(bankdata);
-    };
-
-    getSepay();
-    console.log(bank);
     const onEsc = (e) => e.key === "Escape" && open && onClose?.();
     document.addEventListener("keydown", onEsc);
     return () => document.removeEventListener("keydown", onEsc);

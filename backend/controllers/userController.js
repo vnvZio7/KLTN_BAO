@@ -14,24 +14,42 @@ const getUsers = async (req, res) => {
 // @desc    Get user by ID
 // @route   GET /api/users/:id
 // @access  Private
-const getUserById = async (req, res) => {
+const getUserByDoctorId = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
-      .populate("accountId")
-      .select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user);
+    const users = await User.find({ currentDoctorId: req.user._id })
+      .populate({
+        path: "accountId",
+        select: "-password",
+      })
+      .populate({
+        path: "testHistory",
+      });
+    res.json({ users });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-const updateUser = async (req, res) =>{
+const updateUser = async (req, res) => {
   try {
+    const { testHistory, dominantSymptom, doctorIds, currentDoctorId } =
+      req.body;
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          testHistory,
+          dominantSymptom,
+          doctorIds,
+          currentDoctorId,
+        },
+      },
+      { new: true } // trả về document sau khi update
+    );
+    res.status(201).json({ message: "Đã cập nhật user thành công!", user });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
-    
   }
-}
+};
 
-export { getUsers, getUserById,updateUser };
+export { getUsers, getUserByDoctorId, updateUser };

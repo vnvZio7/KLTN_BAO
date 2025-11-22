@@ -3,7 +3,7 @@ import ExerciseTemplate from "../models/exerciseTemplate.model.js";
 const getExerciseTemplates = async (req, res) => {
   try {
     const exerciseTemplates = await ExerciseTemplate.find();
-    res.json(exerciseTemplates);
+    res.json({ exerciseTemplates });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -18,7 +18,7 @@ const getExerciseTemplateById = async (req, res) => {
       return res
         .status(404)
         .json({ message: "Không tìm thấy bài exerciseTemplate" });
-    res.json(exerciseTemplate);
+    res.json({ exerciseTemplate });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

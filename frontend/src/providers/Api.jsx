@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { API_PATHS } from "../utils/apiPaths";
+import axiosInstance from "../utils/axiosInstance";
 
 const ApiContext = createContext(null);
 
@@ -7,13 +9,23 @@ export const useApi = () => {
 };
 
 export const ApiProvider = (props) => {
-  const API_URL = import.meta.env.VITE_BASE_URL;
+  const [bank, setBank] = useState([]);
+  const getSepay = async () => {
+    const res = await axiosInstance.get(API_PATHS.PAYMENT.GET_SEPAY);
+    const data = res.data.bankaccount;
+    const bankdata = {
+      bankName: data.bank_short_name,
+      accountName: data.account_holder_name,
+      accountNumber: data.account_number,
+    };
+    setBank(bankdata);
+  };
 
-  const userProfile = useState([]);
+  useEffect(() => {
+    getSepay();
+  }, []);
 
   return (
-    <ApiContext.Provider value={{ API_URL }}>
-      {props.children}
-    </ApiContext.Provider>
+    <ApiContext.Provider value={{ bank }}>{props.children}</ApiContext.Provider>
   );
 };

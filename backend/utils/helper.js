@@ -12,9 +12,9 @@ const gadBand = (score) => {
 };
 const roleFromBand = (score) => {
   if (score <= 4) return "None";
-  if (score <= 9) return "Counselor";
-  if (score <= 14) return "Therapist";
-  return "Psychiatrist";
+  if (score <= 9) return "counselor";
+  if (score <= 14) return "therapist";
+  return "psychiatrist";
 };
 
 function pickSuggestedRole(phqScore, gadScore) {
@@ -24,39 +24,4 @@ function pickSuggestedRole(phqScore, gadScore) {
   return { dominant, role };
 }
 
-function trimDoctorForPrompt(d) {
-  return {
-    id: String(d._id),
-    name: d.accountId?.fullName || d.fullName || "Unknown",
-    role: d.role,
-    specializations: d.specializations?.slice(0, 5),
-    modalities: d.modalities?.slice(0, 5),
-    yearsExperience: d.yearsExperience,
-    pricePerWeek: d.pricePerWeek,
-    rating: d.rating,
-  };
-}
-
-// services/testMaxScore.js
-import Test from "../models/test.model.js";
-/** Trả map { [code]: maxScore } cho các code yêu cầu */
-async function getTestsMaxScores(codes = []) {
-  if (!codes.length) return {};
-  const tests = await Test.find({ code: { $in: codes } })
-    .select("code maxScore")
-    .lean();
-  const map = {};
-  for (const t of tests) {
-    map[t.code] = t.maxScore ?? 0;
-  }
-  for (const c of codes) if (map[c] == null) map[c] = 0; // nếu thiếu doc nào
-  return map;
-}
-
-export {
-  trimDoctorForPrompt,
-  pickSuggestedRole,
-  gadBand,
-  phqBand,
-  getTestsMaxScores,
-};
+export { pickSuggestedRole, gadBand, phqBand };

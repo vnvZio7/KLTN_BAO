@@ -2,10 +2,20 @@ import mongoose from "mongoose";
 // Giao bài
 const homeworkAssignmentSchema = new mongoose.Schema(
   {
-    userId: { type: ObjectId, ref: "User", index: true },
-    doctorId: { type: ObjectId, ref: "Doctor", index: true },
-    templateId: { type: ObjectId, ref: "ExerciseTemplate" }, // hoặc null nếu custom
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+    doctorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Doctor",
+      index: true,
+    },
+    templateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ExerciseTemplate",
+    }, // hoặc null nếu custom
     title: String, // nếu custom
+    method: {
+      type: String, // CBT, ACT
+    },
     content: String, // nếu custom
     difficulty: { type: String, enum: ["easy", "medium", "hard"] },
     frequency: {
@@ -13,7 +23,9 @@ const homeworkAssignmentSchema = new mongoose.Schema(
       enum: ["once", "daily", "weekly"],
       default: "daily",
     },
+    attachments: [String],
     dueDate: Date, // hạn hoàn thành
+    estimatedMinutes: Number,
     status: {
       type: String,
       enum: ["assigned", "in_progress", "completed", "overdue"],
@@ -24,4 +36,4 @@ const homeworkAssignmentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("HomeworkAssignment", homeworkAssignmentSchema);
+export default mongoose.model("HomeworkAssignment", homeworkAssignmentSchema);

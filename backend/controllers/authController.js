@@ -71,20 +71,20 @@ const registerUser = async (req, res) => {
         });
       }
 
-      // Upload avatar nếu có
-      let avatarUrl = "";
+      // 1) Avatar
+      let avatarUrl = null;
       if (req.files?.avatar?.[0]) {
         avatarUrl = await uploadBufferToCloudinary(
-          req.files.avatar[0].buffer,
+          req.files.avatar[0], // ⬅️ TRUYỀN CẢ FILE
           "pomera/doctors/avatars"
         );
       }
 
-      // Upload certificates nếu có
+      // 2) Certificates
       let certificateUrls = [];
       if (req.files?.certificates?.length) {
         certificateUrls = await uploadManyBuffers(
-          req.files.certificates,
+          req.files.certificates, // ⬅️ OK
           "pomera/doctors/certificates"
         );
       }
@@ -156,7 +156,31 @@ const loginUser = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findOne({_id:req.user._id}).populate("accountId").select("-password");
+    let user;
+    if (req.account.role === "user") {
+      user = await User.findOne({ _id: req.user._id })
+        .populate("accountId")
+        // populate mảng doctorIds, rồi populate tiếp accountId bên trong Doctor
+        .populate({
+          path: "doctorIds",
+          populate: {
+            path: "accountId",
+            model: "Account",
+            select: "-password", // nếu muốn ẩn password của account bác sĩ
+          },
+        })
+        // populate currentDoctorId + accountId của bác
+        .populate({
+          path: "currentDoctorId",
+          populate: {
+            path: "accountId",
+            model: "Account",
+            select: "-password",
+          },
+        });
+    } else if (req.account.role === "doctor") {
+      user = await Doctor.findOne({ _id: req.user._id }).populate("accountId");
+    }
     res.json({ user });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });

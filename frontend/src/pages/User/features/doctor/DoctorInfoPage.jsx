@@ -48,7 +48,6 @@ const mapDoctorCard = (d) => ({
   specializations: d.specializations || [],
   modalities: d.modalities || [],
   bio: d.bio || "",
-  approval: d.approval?.status || "pending",
   certificates: d.certificates || [],
 });
 
@@ -569,7 +568,7 @@ export default function DoctorInfoPage({ doctor, suggestions = [], onSwitch }) {
       <SwitchDoctorModal
         open={openSwitch}
         onClose={() => setOpenSwitch(false)}
-        suggestions={suggestions}
+        suggestions={suggestions.filter((d) => d._id !== doctor._id)}
         onPick={(picked) => {
           setOpenSwitch(false);
           onSwitch?.(picked); // picked.id = _id
