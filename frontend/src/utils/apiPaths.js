@@ -10,7 +10,9 @@ export const API_PATHS = {
   },
   USERS: {
     GET_ALL_USERS: "/api/users",
-    GET_USER_BY_ID: (userId) => `/api/users/${userId}`,
+    UPDATE_USER: "/api/users",
+    // GET_USER_BY_ID: (userId) => `/api/users/${userId}`,
+    GET_USERS_BY_DOCTORID: "/api/users/doctor",
   },
   ADMIN: {
     GET_DASHBOARD_DATA: "/api/admin/dashboard",
@@ -23,40 +25,46 @@ export const API_PATHS = {
   },
   DOCTORS: {
     GET_ALL_DOCTORS: "/api/doctors",
-    GET_TRAILERS: "/api/movies/trailers",
+    GET_DOCTORS_BY_IDS: "/api/doctors/doctorIds",
     GET_UPCOMING: "/api/movies/upcoming",
     GET_DATA_SEARCH: "/api/movies/search",
-    GET_MOVIE_BY_ID: (movieId) => `/api/movies/${movieId}`,
-    GET_RELEASE_BY_ID: (movieId) => `/api/movies/release/${movieId}`,
+    GET_D: (ids) => `/api/doctors/${ids}`,
   },
   GROQ: {
     GROQ_MATCH_DOCTOR: "/api/groq",
   },
   TRANSACTIONS: {
-    GET_ALL_TYPES: "/api/types",
+    GET_ALL_TRANSACTIONS: "/api/transactions",
+    UPDATE_TRANSACTION: (id) => `/api/transactions/${id}`,
     GET_TRANSACTION_BY_CODE: (code) => `/api/transactions/${code}`,
   },
-  PROVINCES: {
-    GET_ALL_PROVINCES: "/api/provinces",
-    GET_PROVINCE_BY_ID: (provinceId) => `/api/provinces/${provinceId}`,
+  ROOMS: {
+    CREATE_ROOM: "/api/rooms",
+    GET_ROOM: `/api/rooms`,
   },
-  SNACKS: {
-    GET_ALL_SNACKS: "/api/snacks",
+  TEST_RESULTS: {
+    CREATE_TEST_RESULTS: "/api/testresult",
     // GET_PROVINCE_BY_ID: (provinceId) => `/api/provinces/${provinceId}`,
   },
-  SHOWTIMES: {
-    GET_ALL_SHOWTIMES: "/api/showtimes/",
-    CREATE_SHOWTIMES: "/api/showtimes/",
-    GET_GENRES: "/api/showtimes/genres",
-    GET_SHOWTIMES_BY_ID_AND_DATE: (showtime_id, date) =>
-      `/api/showtimes/${showtime_id}/${date}`,
-    GET_SHOWTIMES_BY_ID: (showtime_id) => `/api/showtimes/${showtime_id}`,
+  APPOINTMENTS: {
+    // GET_ALL_SHOWTIMES: "/api/showtimes/",
+    // CREATE_SHOWTIMES: "/api/showtimes/",
+    // GET_GENRES: "/api/showtimes/genres",
+    // GET_SHOWTIMES_BY_ID_AND_DATE: (showtime_id, date) =>
+    //   `/api/showtimes/${showtime_id}/${date}`,
+    GET_APPOINTMENTS_BY_ROOMID: (roomId) => `/api/appointments/${roomId}`,
   },
-  BOOKINGS: {
-    GET_ALL_BOOKINGS: "/api/bookings-users",
-    CREATE_BOOKING: "/api/bookings-users",
-    GET_BOOKING_BY_ID: (id) => `/api/bookings-users/${id}`,
-    GET_BOOKED_SEATS: (id) => `/api/bookings/seats/${id}`,
+  EXERCISES: {
+    GET_ALL_EXERCISES: "/api/exercises",
+  },
+  HOMEWORK_ASSIGNMENTS: {
+    GET_HOMEWORK_ASSIGNMENT_BY_ID: (userId) =>
+      `/api/homework-assignments/${userId}`,
+    CREATE_HOMEWORK_ASSIGNMENT: "/api/homework-assignments",
+  },
+  MESSAGES: {
+    GET_MESSAGES_BY_ROOM_ID: (roomId) => `/api/messages/${roomId}`,
+    SEND_MESSAGE: "/api/messages",
   },
   PAYMENT: {
     GET_SEPAY: "/api/payment/sepay",

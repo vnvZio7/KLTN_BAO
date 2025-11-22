@@ -17,7 +17,9 @@ import {
   Plus,
   Edit3,
   Trash2,
+  Info,
 } from "lucide-react";
+import { useUserContext } from "../../context/userContext";
 
 /* --------------------------- Tiny UI primitives --------------------------- */
 function IconBtn({ children, icon: Icon, className = "", ...rest }) {
@@ -252,6 +254,7 @@ const ADMIN_EXERCISES_INIT = [
 
 /* ------------------------------- Main shell ------------------------------ */
 export default function AdminPortal() {
+  const { handleLogout } = useUserContext();
   const [nav, setNav] = useState("dashboard");
   const [stats] = useState(ADMIN_STATS_INIT);
   const [accounts, setAccounts] = useState(ADMIN_ACCOUNTS_INIT);
@@ -375,7 +378,10 @@ export default function AdminPortal() {
         </nav>
 
         <div className="mt-auto p-3">
-          <button className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-zinc-50">
+          <button
+            onClick={handleLogout}
+            className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-zinc-50"
+          >
             <LogOut className="h-4 w-4" /> Đăng xuất
           </button>
         </div>
@@ -519,7 +525,7 @@ function AdminDashboard({ stats, doctors, exercises }) {
   const pending = doctors.filter((d) => d.status === "pending").length;
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard icon={Users} label="Bệnh nhân" value={stats.totalPatients} />
         <StatCard icon={UserCog} label="Bác sĩ" value={stats.totalDoctors} />
         <StatCard icon={BarChart3} label="Bài test" value={stats.testsRun} />
@@ -527,11 +533,6 @@ function AdminDashboard({ stats, doctors, exercises }) {
           icon={FileStack}
           label="Bài tập hoàn thành"
           value={stats.assignmentsCompleted}
-        />
-        <StatCard
-          icon={ShieldCheck}
-          label="AI hiệu quả"
-          value={`${Math.round(stats.aiEffectiveness * 100)}%`}
         />
       </div>
 
@@ -869,28 +870,6 @@ function AdminDoctors({ doctors, onApprove, onReject }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Tìm bác sĩ"
-            className="h-10 w-64 rounded-xl border border-zinc-200 pl-9 pr-3 text-sm outline-none"
-          />
-        </div>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="h-10 rounded-xl border border-zinc-200 px-3 text-sm outline-none"
-        >
-          <option value="all">Tất cả</option>
-          <option value="approved">Approved</option>
-          <option value="pending">Pending</option>
-          <option value="rejected">Rejected</option>
-        </select>
-      </div>
-
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((d) => (
           <div key={d.id} className="rounded-2xl border bg-white p-4">
@@ -931,6 +910,13 @@ function AdminDoctors({ doctors, onApprove, onReject }) {
                 onClick={() => onReject(d.id)}
               >
                 Từ chối
+              </IconBtn>
+              <IconBtn
+                icon={Info}
+                className="border-yellow-200 text-yellow-800 hover:bg-yellow-80"
+                onClick={() => {}}
+              >
+                Chi tiết
               </IconBtn>
             </div>
           </div>

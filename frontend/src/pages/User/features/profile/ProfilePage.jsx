@@ -215,7 +215,9 @@ export default function ProfilePage({ user = {} }) {
       email: user.accountId.email ?? "",
       phone: user.accountId.phone ?? "",
       gender: user.accountId.gender ?? "",
-      birthDate: user.accountId.birthDate ? toDateInput(user.accountId.birthDate) : "",
+      birthDate: user.accountId.birthDate
+        ? toDateInput(user.accountId.birthDate)
+        : "",
     }),
     [user]
   );
@@ -226,9 +228,7 @@ export default function ProfilePage({ user = {} }) {
   const [pwOpen, setPwOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  const setUser = (user)=>{
-
-  }
+  const setUser = (user) => {};
 
   // đồng bộ khi prop user đổi (nếu đang không chỉnh)
   useEffect(() => {

@@ -28,7 +28,22 @@ import {
   PencilLine,
   CheckCircle2,
   Pencil,
+  Clock3,
+  Paperclip,
+  DollarSign,
 } from "lucide-react";
+import { useUserContext } from "../../context/userContext";
+import axiosInstance from "../../utils/axiosInstance";
+import { API_PATHS } from "../../utils/apiPaths";
+import {
+  convertDifficult,
+  dateFormat,
+  formatAge,
+  prettyTime,
+  reconvertDifficult,
+} from "../../utils/helper";
+import { THERAPY_METHODS } from "../../utils/data";
+import toast from "react-hot-toast";
 
 /**
  * Doctor Portal — single file demo for React + Vite + Tailwind
@@ -70,8 +85,7 @@ function classifyPHQ9(score = 0) {
   if (score <= 4) return { label: "Bình thường", tone: "ok" };
   if (score <= 9) return { label: "Nhẹ", tone: "mild" };
   if (score <= 14) return { label: "Trung bình", tone: "warn" };
-  if (score <= 19) return { label: "Nặng vừa", tone: "alert" };
-  return { label: "Rất nặng", tone: "danger" };
+  return { label: "Nặng", tone: "danger" };
 }
 // GAD-7 classification (0–21)
 function classifyGAD7(score = 0) {
@@ -99,163 +113,6 @@ function toneToClass(tone) {
 }
 
 // --------------------------- Mocked Data -----------------------------
-const MOCK_PATIENTS = [
-  {
-    id: "p001",
-    name: "Trần Minh Anh",
-    gender: "Nữ",
-    age: 27,
-    tags: ["Trầm cảm", "Lo âu"],
-    latestTests: { PHQ9: 14, GAD7: 8 },
-    nextCall: new Date(Date.now() + 36e5).toISOString(), // +1h
-    unread: 2,
-    assignments: [
-      {
-        id: uid(),
-        code: "CBT_TR",
-        title: "CBT Thought Record",
-        due: addDaysISO(2),
-        status: "nộp bài",
-      },
-      {
-        id: uid(),
-        code: "MF_BREATH",
-        title: "Mindfulness Breathing",
-        due: addDaysISO(5),
-        status: "đang làm",
-      },
-    ],
-    notes: "Ưu tiên can thiệp CBT + Mindfulness, theo dõi giấc ngủ.",
-    messages: [
-      {
-        id: uid(),
-        sender: "patient",
-        text: "Em cảm thấy đỡ hơn một chút.",
-        at: addMinsISO(-120),
-      },
-      {
-        id: uid(),
-        sender: "doctor",
-        text: "Tốt lắm, tiếp tục bài thở 5-7-8 nhé!",
-        at: addMinsISO(-110),
-      },
-    ],
-  },
-  {
-    id: "p002",
-    name: "Ngô Quốc Huy",
-    gender: "Nam",
-    age: 31,
-    tags: ["Mất ngủ"],
-    latestTests: { PHQ9: 6, GAD7: 5 },
-    nextCall: addDaysISO(1, 10),
-    unread: 0,
-    assignments: [
-      {
-        id: uid(),
-        code: "SLEEP_HYGIENE",
-        title: "Sleep Hygiene Checklist",
-        due: addDaysISO(1),
-        status: "chưa làm",
-      },
-    ],
-    notes: "Đề xuất sleep hygiene + hạn chế caffeine.",
-    messages: [],
-  },
-  {
-    id: "p003",
-    name: "Bùi Gia Hân",
-    gender: "Nữ",
-    age: 24,
-    tags: ["Ám ảnh cưỡng chế"],
-    latestTests: { PHQ9: 9, GAD7: 12 },
-    nextCall: addDaysISO(3, 16),
-    unread: 1,
-    assignments: [],
-    notes: "Theo dõi exposure hierarchy tuần này.",
-    messages: [
-      {
-        id: uid(),
-        sender: "patient",
-        text: "Khi tiếp xúc em hơi lo lắng.",
-        at: addMinsISO(-60),
-      },
-    ],
-  },
-  {
-    id: "p004",
-    name: "Phạm Nhật Quân",
-    gender: "Nam",
-    age: 29,
-    tags: ["Stress công việc"],
-    latestTests: { PHQ9: 4, GAD7: 3 },
-    nextCall: null,
-    unread: 0,
-    assignments: [],
-    notes: "Coaching kỹ năng quản lý thời gian.",
-    messages: [],
-  },
-  {
-    id: "p005",
-    name: "Đỗ Thu Hà",
-    gender: "Nữ",
-    age: 33,
-    tags: ["Rối loạn hoảng sợ"],
-    latestTests: { PHQ9: 8, GAD7: 15 },
-    nextCall: addDaysISO(2, 9),
-    unread: 3,
-    assignments: [
-      {
-        id: uid(),
-        code: "EXPOSURE_LITE",
-        title: "Mini Exposure Steps",
-        due: addDaysISO(4),
-        status: "đang làm",
-      },
-    ],
-    notes: "Ưu tiên psychoeducation + breathing.",
-    messages: [],
-  },
-  {
-    id: "p006",
-    name: "Vũ Hải Long",
-    gender: "Nam",
-    age: 26,
-    tags: ["Lo âu"],
-    latestTests: { PHQ9: 10, GAD7: 11 },
-    nextCall: null,
-    unread: 0,
-    assignments: [],
-    notes: "—",
-    messages: [],
-  },
-  {
-    id: "p007",
-    name: "Lê Quỳnh Nhi",
-    gender: "Nữ",
-    age: 22,
-    tags: ["Tự ti"],
-    latestTests: { PHQ9: 5, GAD7: 7 },
-    nextCall: null,
-    unread: 0,
-    assignments: [],
-    notes: "—",
-    messages: [],
-  },
-  {
-    id: "p008",
-    name: "Phan Tấn Tài",
-    gender: "Nam",
-    age: 35,
-    tags: ["Trầm cảm"],
-    latestTests: { PHQ9: 18, GAD7: 9 },
-    nextCall: addDaysISO(1, 14),
-    unread: 0,
-    assignments: [],
-    notes: "Theo sát an toàn.",
-    messages: [],
-  },
-];
 
 const MOCK_CALL_REQUESTS = [
   {
@@ -278,37 +135,6 @@ const MOCK_AVAILABILITY = [
   addDaysISO(1, 10),
   addDaysISO(2, 11),
   addDaysISO(3, 9),
-];
-
-const HOMEWORK_TEMPLATES = [
-  {
-    code: "CBT_TR",
-    name: "CBT Thought Record",
-    difficulty: "Easy",
-    duration: "15–20m",
-    target: ["Trầm cảm", "Lo âu"],
-  },
-  {
-    code: "MF_BREATH",
-    name: "Mindfulness 5–7–8",
-    difficulty: "Easy",
-    duration: "10m",
-    target: ["Lo âu", "Mất ngủ"],
-  },
-  {
-    code: "EXPOSURE_LITE",
-    name: "Exposure Mini Hierarchy",
-    difficulty: "Medium",
-    duration: "20–30m",
-    target: ["Ám ảnh cưỡng chế", "Sợ hãi"],
-  },
-  {
-    code: "SLEEP_HYGIENE",
-    name: "Sleep Hygiene Checklist",
-    difficulty: "Easy",
-    duration: "10–15m",
-    target: ["Mất ngủ"],
-  },
 ];
 
 function addDaysISO(days = 0, atHour = 9) {
@@ -365,7 +191,7 @@ const Modal = ({ open, title, onClose, children, footer }) => {
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[65vh] overflow-auto p-5">{children}</div>
+        <div className="max-h-[72vh] overflow-auto p-5">{children}</div>
         {footer && <div className="border-t px-5 py-4">{footer}</div>}
       </div>
     </div>
@@ -401,20 +227,39 @@ const Progress = ({ value = 0, max = 100, label }) => (
 
 // --------------------------- Main Component --------------------------
 export default function DoctorPage() {
+  const {
+    handleLogout,
+    user,
+    patients,
+    rooms,
+    exercises,
+    assignments,
+    sendMessage,
+  } = useUserContext();
+
   const [mode, setMode] = useState("template"); // "template" | "custom"
   const [templateSearch, setTemplateSearch] = useState("");
+
+  const [templateFilter, setTemplateFilter] = useState("all");
+
   const [customTitle, setCustomTitle] = useState("");
   const [customDesc, setCustomDesc] = useState("");
   const [customDifficulty, setCustomDifficulty] = useState("Dễ"); // Dễ | Trung bình | Khó
-  const [customDuration, setCustomDuration] = useState("10–15 phút");
-  const [customTargets, setCustomTargets] = useState(""); // nhập tag, cách nhau dấu phẩy
+  const [customDuration, setCustomDuration] = useState(10);
+  const [customMethod, setCustomMethod] = useState(THERAPY_METHODS[0]);
+  const [customAttachments, setCustomAttachments] = useState([]);
+  const [customFrequency, setCustomFrequency] = useState("daily");
+
+  const [openAssignModal, setOpenAssignModal] = useState(false);
+  const [templatePick, setTemplatePick] = useState(exercises[0].code);
+  const [templateDue, setTemplateDue] = useState(addDaysISO(3));
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [nav, setNav] = useState("dashboard");
-  const [patients, setPatients] = useState(MOCK_PATIENTS);
+
   const [activePatientId, setActivePatientId] = useState(patients[0]?.id);
   const activePatient = useMemo(
-    () => patients.find((p) => p.id === activePatientId),
+    () => patients.find((p) => p._id === activePatientId) || patients[0],
     [patients, activePatientId]
   );
 
@@ -425,7 +270,7 @@ export default function DoctorPage() {
       .filter((p) => p.nextCall)
       .map((p) => ({
         id: uid(),
-        patientId: p.id,
+        patientId: p._id,
         time: p.nextCall,
         duration: 45,
         status: "scheduled",
@@ -436,22 +281,17 @@ export default function DoctorPage() {
     {
       id: uid(),
       type: "info",
-      text: "3 yêu cầu lịch gọi đang chờ bạn duyệt",
+      text: "Đã kết nối tới bệnh nhân Nguyễn Bảo",
       at: addMinsISO(-15),
       read: false,
     },
   ]);
 
-  // UI modals
-  const [openAssignModal, setOpenAssignModal] = useState(false);
   const [openScheduleModal, setOpenScheduleModal] = useState(false);
   const [scheduleDraft, setScheduleDraft] = useState({
     patientId: null,
     time: addDaysISO(0, new Date().getHours() + 2),
   });
-
-  const [templatePick, setTemplatePick] = useState(HOMEWORK_TEMPLATES[0].code);
-  const [templateDue, setTemplateDue] = useState(addDaysISO(3));
 
   // Derived stats
   const stats = useMemo(() => {
@@ -461,16 +301,29 @@ export default function DoctorPage() {
     const pendingReq = callRequests.filter(
       (r) => r.status === "pending"
     ).length;
-    const homeworkDueToday = patients.reduce(
-      (acc, p) =>
-        acc +
-        p.assignments.filter(
-          (a) => withinSameDay(a.due) && a.status !== "đã duyệt"
-        ).length,
-      0
-    );
+    const homeworkDueToday = 0;
+    // patients.reduce(
+    //   (acc, p) =>
+    //     acc +
+    //     p.assignments.filter(
+    //       (a) => withinSameDay(a.due) && a.status !== "đã duyệt"
+    //     ).length,
+    //   0
+    // );
     return { total, activeChats, upcomingToday, pendingReq, homeworkDueToday };
   }, [patients, calls, callRequests]);
+  console.log("rooms: ", rooms);
+  const sendMsg = async ({ roomId, text }) => {
+    if (!text.trim()) return;
+
+    // setPatients((ps) =>
+    //   ps.map((p) =>
+    //     p._id === patientId
+    //       ? { ...p, messages: [...(p.messages || []), msg], unread: 0 }
+    //       : p
+    //   )
+    // );
+  };
 
   // ---------------------- Actions (mocked) ----------------------
   const notify = (text, type = "info") =>
@@ -479,44 +332,15 @@ export default function DoctorPage() {
       ...n,
     ]);
 
-  const acceptRequest = (reqId) => {
-    setCallRequests((arr) => arr.filter((r) => r.id !== reqId));
-    const req = callRequests.find((r) => r.id === reqId);
-    if (!req) return;
-    setCalls((c) => [
-      {
-        id: uid(),
-        patientId: req.patientId,
-        time: req.preferred,
-        duration: 45,
-        status: "scheduled",
-      },
-      ...c,
-    ]);
-    notify(
-      `Đã chấp nhận lịch gọi với ${nameOf(req.patientId)} lúc ${fmtDateTime(
-        req.preferred
-      )}`,
-      "success"
-    );
-  };
-
-  const declineRequest = (reqId) => {
-    setCallRequests((arr) =>
-      arr.map((r) => (r.id === reqId ? { ...r, status: "declined" } : r))
-    );
-    notify("Đã từ chối một yêu cầu lịch gọi", "warn");
-  };
-
   const scheduleCall = ({ patientId, time }) => {
     if (!patientId || !time) return;
     setCalls((c) => [
       { id: uid(), patientId, time, duration: 45, status: "scheduled" },
       ...c,
     ]);
-    setPatients((ps) =>
-      ps.map((p) => (p.id === patientId ? { ...p, nextCall: time } : p))
-    );
+    // setPatients((ps) =>
+    //   ps.map((p) => (p._id === patientId ? { ...p, nextCall: time } : p))
+    // );
     notify(
       `Đã tạo lịch gọi ${fmtDateTime(time)} với ${nameOf(patientId)}`,
       "success"
@@ -529,27 +353,27 @@ export default function DoctorPage() {
   };
 
   const assignHomework = ({ patientId, templateCode, due }) => {
-    const tpl = HOMEWORK_TEMPLATES.find((t) => t.code === templateCode);
+    const tpl = exercises.find((t) => t._id === templateCode);
     if (!tpl) return;
-    setPatients((ps) =>
-      ps.map((p) =>
-        p.id === patientId
-          ? {
-              ...p,
-              assignments: [
-                {
-                  id: uid(),
-                  code: tpl.code,
-                  title: tpl.name,
-                  due,
-                  status: "chưa làm",
-                },
-                ...p.assignments,
-              ],
-            }
-          : p
-      )
-    );
+    // setPatients((ps) =>
+    //   ps.map((p) =>
+    //     p._id === patientId
+    //       ? {
+    //           ...p,
+    //           assignments: [
+    //             {
+    //               id: uid(),
+    //               code: tpl.code,
+    //               title: tpl.name,
+    //               due,
+    //               status: "chưa làm",
+    //             },
+    //             ...p.assignments,
+    //           ],
+    //         }
+    //       : p
+    //   )
+    // );
     notify(
       `Đã giao bài tập “${tpl.name}” cho ${nameOf(patientId)} (hạn ${fmtDate(
         due
@@ -558,35 +382,105 @@ export default function DoctorPage() {
     );
   };
 
+  function validateHomeworkPayload({
+    title,
+    content,
+    difficulty,
+    duration,
+    method,
+    frequency,
+    attachments,
+    due,
+  }) {
+    // Title
+    if (!title || title.trim().length < 3) {
+      return "Tiêu đề quá ngắn (tối thiểu 3 ký tự).";
+    }
+
+    // Content
+    if (!content || content.trim().length < 10) {
+      return "Nội dung / Hướng dẫn quá ngắn (tối thiểu 10 ký tự).";
+    }
+    if (!THERAPY_METHODS.includes(method)) {
+      return "Phương pháp trị liệu không hợp lệ.";
+    }
+
+    // Difficulty
+    const DIFFICULTIES = ["easy", "medium", "hard"];
+    if (!DIFFICULTIES.includes(difficulty)) {
+      return "Độ khó không hợp lệ.";
+    }
+
+    // Duration MUST be number
+    if (typeof duration !== "number" || isNaN(duration) || duration < 1) {
+      return "Thời lượng phải là số phút hợp lệ (>= 1).";
+    }
+
+    // Frequency
+    const FREQUENCIES = ["once", "daily", "weekly"];
+    if (!FREQUENCIES.includes(frequency)) {
+      return "Tần suất không hợp lệ.";
+    }
+
+    // Attachments
+    if (attachments && attachments.length > 0) {
+      for (const file of attachments) {
+        if (!(file instanceof File)) {
+          return "Tệp đính kèm phải là file hợp lệ.";
+        }
+        if (file.size > 20 * 1024 * 1024) {
+          return `File "${file.name}" vượt quá giới hạn 20MB.`;
+        }
+      }
+    }
+
+    // Due date
+    if (!due) return "Bạn chưa chọn hạn nộp.";
+
+    const dueDate = new Date(due);
+    if (dueDate <= new Date()) {
+      return "Hạn nộp phải lớn hơn thời điểm hiện tại.";
+    }
+
+    return null; // hợp lệ
+  }
+
   const markAssignment = ({ patientId, assignmentId, status }) => {
-    setPatients((ps) =>
-      ps.map((p) =>
-        p.id === patientId
-          ? {
-              ...p,
-              assignments: p.assignments.map((a) =>
-                a.id === assignmentId ? { ...a, status } : a
-              ),
-            }
-          : p
-      )
-    );
+    // setPatients((ps) =>
+    //   ps.map((p) =>
+    //     p._id === patientId
+    //       ? {
+    //           ...p,
+    //           assignments: p.assignments.map((a) =>
+    //             a.id === assignmentId ? { ...a, status } : a
+    //           ),
+    //         }
+    //       : p
+    //   )
+    // );
   };
 
-  const sendMsg = ({ patientId, text }) => {
-    if (!text.trim()) return;
-    const msg = { id: uid(), sender: "doctor", text, at: todayISO() };
-    setPatients((ps) =>
-      ps.map((p) =>
-        p.id === patientId
-          ? { ...p, messages: [...(p.messages || []), msg], unread: 0 }
-          : p
-      )
+  const nameOf = (pid) => patients.find((p) => p._id === pid)?.name || "";
+
+  const ap = useMemo(
+    () =>
+      patients.find((p) => p._id === activePatientId) || patients[0] || null,
+    [patients, activePatientId]
+  );
+
+  // Dropdown chọn bệnh nhân (phải ngoài cùng) + tìm kiếm bên trong
+  const [openPatientMenu, setOpenPatientMenu] = useState(false);
+  const [patientQuery, setPatientQuery] = useState("");
+
+  const patientFiltered = useMemo(() => {
+    const q = patientQuery.trim().toLowerCase();
+    if (!q) return patients;
+    return patients.filter(
+      (p) =>
+        p.accountId.fullName.toLowerCase().includes(q) ||
+        (p.tags || []).some((t) => (t || "").toLowerCase().includes(q))
     );
-  };
-
-  const nameOf = (pid) => patients.find((p) => p.id === pid)?.name || "";
-
+  }, [patientQuery, patients]);
   // ------------------------------ Views ------------------------------
   return (
     <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
@@ -603,9 +497,11 @@ export default function DoctorPage() {
           {sidebarOpen && (
             <div>
               <div className="text-sm font-semibold leading-tight">
-                Doctor Portal
+                {user.accountId.fullName || "Doctor"}
               </div>
-              <div className="text-xs text-zinc-500">Mental Health</div>
+              <div className="text-xs text-zinc-500">
+                {user.accountId.email || "Doctor"}
+              </div>
             </div>
           )}
           <button
@@ -655,7 +551,10 @@ export default function DoctorPage() {
               <span className="h-2 w-2 rounded-full bg-emerald-500" /> Online
             </div>
           </div>
-          <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-zinc-50">
+          <button
+            onClick={handleLogout}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-zinc-50"
+          >
             <LogOut className="h-4 w-4" /> Đăng xuất
           </button>
         </div>
@@ -664,35 +563,92 @@ export default function DoctorPage() {
       {/* Main */}
       <main className="mx-auto w-full max-w-[1300px] px-4 py-5">
         {/* Header */}
-        <header className="mb-5 flex flex-wrap items-center gap-3">
+        <header className="mb-5 flex flex-wrap items-center gap-3 justify-between">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-zinc-900 text-white md:hidden">
               <Stethoscope className="h-5 w-5" />
             </div>
             <h1 className="text-xl font-semibold capitalize">{labelOf(nav)}</h1>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-              <input
-                className="h-10 w-64 rounded-xl border border-zinc-200 pl-9 pr-3 text-sm outline-none focus:border-zinc-400"
-                placeholder="Tìm bệnh nhân, ghi chú…"
-              />
-            </div>
-            <IconBtn icon={Bell} onClick={() => setNav("notifications")}>
-              Thông báo
-            </IconBtn>
-            <div className="flex items-center gap-2 rounded-xl border px-3 py-2">
-              <div className="grid h-7 w-7 place-items-center rounded-full bg-zinc-800 text-white">
-                Đ
+          {(nav == "patients" || nav === "homework") &&
+            (ap ? (
+              <div className="flex items-center gap-3">
+                {/* Dropdown chọn bệnh nhân */}
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50"
+                  onClick={() => {
+                    setOpenPatientMenu((v) => !v);
+                    setPatientQuery("");
+                  }}
+                >
+                  <Avatar name={ap.accountId.fullName} />
+                  <div>
+                    <div className="text-base font-semibold">
+                      {ap.accountId.fullName}
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      {ap.accountId.gender} •{" "}
+                      {formatAge(ap.accountId.birthDate)}t •{" "}
+                      {ap.dominantSymptom}
+                    </div>
+                  </div>
+                  <ChevronDown className="h-4 w-4" />
+                </button>
               </div>
-              <div className="hidden text-sm md:block">
-                <div className="font-medium">Dr. Đặng</div>
-                <div className="text-xs text-zinc-500">Tâm lý trị liệu</div>
+            ) : (
+              <div className="text-sm text-zinc-500">Chưa chọn bệnh nhân</div>
+            ))}
+          {openPatientMenu && (
+            <div
+              className="absolute right-0 top-20 z-20 w-[360px] max-h-[70vh] overflow-auto rounded-xl border bg-white shadow-lg"
+              onMouseLeave={() => setOpenPatientMenu(false)}
+            >
+              <div className="sticky top-0 bg-white p-2 border-b">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    autoFocus
+                    value={patientQuery}
+                    onChange={(e) => setPatientQuery(e.target.value)}
+                    placeholder="Tìm theo tên, tag…"
+                    className="h-10 w-full rounded-lg border border-zinc-200 pl-9 pr-3 text-sm outline-none focus:border-zinc-400"
+                  />
+                </div>
               </div>
-              <ChevronDown className="ml-1 h-4 w-4 text-zinc-500" />
+              <div className="p-2">
+                {patientFiltered.length === 0 && (
+                  <div className="p-3 text-xs text-zinc-500">
+                    Không tìm thấy kết quả
+                  </div>
+                )}
+                {patientFiltered.map((p) => (
+                  <button
+                    key={p._id}
+                    onClick={() => {
+                      setActivePatientId(p._id);
+                      setOpenPatientMenu(false);
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-zinc-50 ${
+                      ap?.id === p._id ? "bg-zinc-50" : ""
+                    }`}
+                  >
+                    <Avatar name={p.accountId.fullName} />
+                    <div>
+                      <div className="text-base font-semibold">
+                        {p.accountId.fullName}
+                      </div>
+                      <div className="text-xs text-zinc-500">
+                        {p.accountId.gender} •{" "}
+                        {formatAge(p.accountId.birthDate)}t •{" "}
+                        {p.dominantSymptom}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </header>
 
         {/* Routed Views */}
@@ -700,6 +656,7 @@ export default function DoctorPage() {
           <Dashboard
             stats={stats}
             patients={patients}
+            rooms={rooms}
             calls={calls}
             callRequests={callRequests}
             setNav={setNav}
@@ -710,7 +667,8 @@ export default function DoctorPage() {
         {nav === "patients" && (
           <PatientsView
             patients={patients}
-            setPatients={setPatients}
+            // setPatients={setPatients}
+            assignments={assignments}
             activePatientId={activePatientId}
             setActivePatientId={setActivePatientId}
             onAssign={() => setOpenAssignModal(true)}
@@ -727,10 +685,8 @@ export default function DoctorPage() {
         {nav === "messages" && (
           <MessagesView
             patients={patients}
-            setPatients={setPatients}
-            activePatientId={activePatientId}
-            setActivePatientId={setActivePatientId}
-            onSend={sendMsg}
+            rooms={rooms}
+            activeId={activePatientId}
           />
         )}
 
@@ -745,8 +701,10 @@ export default function DoctorPage() {
 
         {nav === "homework" && (
           <HomeworkView
+            assignments={assignments}
             patients={patients}
-            setPatients={setPatients}
+            activePatientId={activePatientId}
+            // setPatients={setPatients}
             onMark={markAssignment}
             onAssignOpen={() => setOpenAssignModal(true)}
           />
@@ -762,73 +720,102 @@ export default function DoctorPage() {
         )}
 
         {nav === "settings" && (
-          <SettingsView availability={availability} onAddAvail={addAvail} />
+          <SettingsView
+            doctor={user}
+            availability={availability}
+            onAddAvail={addAvail}
+          />
         )}
       </main>
 
       {/* Assign Homework Modal */}
       <Modal
         open={openAssignModal}
-        title={`Giao bài tập cho ${activePatient?.name || "bệnh nhân"}`}
+        title={`Giao bài tập cho ${
+          activePatient?.accountId?.fullName || "bệnh nhân"
+        }`}
         onClose={() => setOpenAssignModal(false)}
         footer={
-          <div className="flex items-center justify-end gap-2">
-            <IconBtn
-              className="border-rose-200 text-rose-600 hover:bg-rose-50"
-              icon={X}
-              onClick={() => setOpenAssignModal(false)}
-            >
-              Hủy
-            </IconBtn>
-            <IconBtn
-              className="border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white"
-              icon={Check}
-              disabled={
-                mode === "template"
-                  ? !templatePick
-                  : customTitle.trim().length < 3
-              }
-              onClick={() => {
-                const payload =
-                  mode === "template"
-                    ? {
-                        patientId: activePatientId,
-                        templateCode: templatePick,
-                        due: templateDue,
-                      }
-                    : {
-                        patientId: activePatientId,
-                        due: templateDue,
-                        custom: {
-                          title: customTitle.trim(),
-                          description: customDesc.trim(),
-                          difficulty: customDifficulty,
-                          duration: customDuration.trim(),
-                          target: customTargets
-                            .split(",")
-                            .map((s) => s.trim())
-                            .filter(Boolean),
+          mode === "custom" ? (
+            <div className="flex items-center justify-end gap-2">
+              <IconBtn
+                className="border-rose-200 text-rose-600 hover:bg-rose-50"
+                icon={X}
+                onClick={() => setOpenAssignModal(false)}
+              >
+                Hủy
+              </IconBtn>
+              <IconBtn
+                className="border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-700! hover:text-white"
+                icon={Check}
+                onClick={async () => {
+                  // Luôn gửi dưới dạng "custom", có kèm theo templateCode nếu có
+                  console.log("payload");
+                  const payload = {
+                    userId: activePatient._id,
+                    doctorId: user._id,
+                    title: customTitle.trim(),
+                    content: customDesc.trim(),
+                    difficulty: reconvertDifficult(customDifficulty),
+                    frequency: customFrequency,
+                    dueDate: templateDue,
+                    duration: customDuration,
+                    method: customMethod,
+                  };
+                  const error = validateHomeworkPayload({
+                    title: payload.title,
+                    content: payload.content,
+                    difficulty: payload.difficulty,
+                    frequency: payload.frequency,
+                    attachments: customAttachments,
+                    due: payload.dueDate,
+                    duration: payload.duration,
+                    method: payload.method,
+                  });
+
+                  if (error) {
+                    alert(error);
+                    return;
+                  }
+                  alert("send");
+                  try {
+                    // 2. Tạo FormData để gửi cả JSON + file
+                    const formData = new FormData();
+
+                    // Gửi object assignment dưới dạng JSON string
+                    formData.append("payload", JSON.stringify(payload));
+
+                    // Gửi từng file đính kèm
+                    (customAttachments || []).forEach((file) => {
+                      formData.append("attachments", file); // backend: req.files["attachments"]
+                    });
+
+                    // 3. Gửi request lên backend
+                    const res = await axiosInstance.post(
+                      API_PATHS.HOMEWORK_ASSIGNMENTS.CREATE_HOMEWORK_ASSIGNMENT,
+                      formData,
+                      {
+                        headers: {
+                          "Content-Type": "multipart/form-data",
                         },
-                      };
-                assignHomework(payload);
-                setOpenAssignModal(false);
-              }}
-            >
-              Xác nhận giao bài
-            </IconBtn>
-          </div>
+                      }
+                    );
+                    toast.success("Giao bài tập thành công");
+                  } catch (error) {
+                    toast.error(error.message);
+                  }
+                  // assignHomework(payload);
+                  // setOpenAssignModal(false);
+                }}
+              >
+                Xác nhận giao bài
+              </IconBtn>
+            </div>
+          ) : (
+            <div className="mb-5"></div>
+          )
         }
       >
-        {/** ---------- STATE BỔ SUNG ---------- */}
-        {/** Đặt các useState này gần nơi bạn khai báo state khác: 
-      const [mode, setMode] = useState("template"); // "template" | "custom"
-      const [templateSearch, setTemplateSearch] = useState("");
-      const [customTitle, setCustomTitle] = useState("");
-      const [customDesc, setCustomDesc] = useState("");
-      const [customDifficulty, setCustomDifficulty] = useState("Dễ"); // Dễ | Trung bình | Khó
-      const [customDuration, setCustomDuration] = useState("10–15 phút");
-      const [customTargets, setCustomTargets] = useState(""); // nhập tag, cách nhau dấu phẩy
-  */}
         <div className="space-y-4">
           {/* Tabs chọn chế độ */}
           <div className="inline-flex rounded-xl border border-zinc-200 p-1 bg-zinc-50">
@@ -856,73 +843,138 @@ export default function DoctorPage() {
             </button>
           </div>
 
-          {/* Due date */}
-          <div className="pt-1">
-            <label className="block text-sm font-medium">Hạn nộp</label>
-            <input
-              type="datetime-local"
-              className="mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
-              value={toLocalInputValue(templateDue)}
-              onChange={(e) =>
-                setTemplateDue(fromLocalInputValue(e.target.value))
-              }
-            />
-          </div>
-
-          {/* Mode: TEMPLATE */}
+          {/* MODE: MẪU CÓ SẴN */}
           {mode === "template" && (
             <div className="space-y-3">
               <label className="block text-sm font-medium">
                 Chọn mẫu bài tập
               </label>
 
-              <div className="relative">
-                <input
-                  value={templateSearch}
-                  onChange={(e) => setTemplateSearch(e.target.value)}
-                  placeholder="Tìm mẫu theo tên, tag…"
-                  className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
-                />
+              {/* Thanh tìm kiếm + filter Lo âu / Trầm cảm */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[180px]">
+                  <input
+                    value={templateSearch}
+                    onChange={(e) => setTemplateSearch(e.target.value)}
+                    placeholder="Tìm mẫu theo tên…"
+                    className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                  />
+                </div>
+
+                {/* Nhóm nút filter */}
+                <div className="inline-flex rounded-xl border border-zinc-200 bg-zinc-50 p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setTemplateFilter("all")}
+                    className={`px-3 py-1 rounded-lg ${
+                      templateFilter === "all"
+                        ? "bg-white border border-zinc-200 font-medium"
+                        : "text-zinc-600"
+                    }`}
+                  >
+                    Tất cả
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTemplateFilter("lo-au")}
+                    className={`px-3 py-1 rounded-lg ${
+                      templateFilter === "lo-au"
+                        ? "bg-white border border-zinc-200 font-medium"
+                        : "text-zinc-600"
+                    }`}
+                  >
+                    Lo âu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTemplateFilter("tram-cam")}
+                    className={`px-3 py-1 rounded-lg ${
+                      templateFilter === "tram-cam"
+                        ? "bg-white border border-zinc-200 font-medium"
+                        : "text-zinc-600"
+                    }`}
+                  >
+                    Trầm cảm
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 max-h-[50vh] overflow-auto">
-                {HOMEWORK_TEMPLATES.filter((t) => {
-                  const q = templateSearch.trim().toLowerCase();
-                  if (!q) return true;
-                  return (
-                    t.name.toLowerCase().includes(q) ||
-                    (t.target || []).some((tg) =>
-                      String(tg).toLowerCase().includes(q)
-                    )
-                  );
-                }).map((t) => (
-                  <button
-                    key={t.code}
-                    className={`rounded-2xl border p-4 text-left hover:bg-zinc-50 ${
-                      templatePick === t.code
-                        ? "border-zinc-900"
-                        : "border-zinc-200"
-                    }`}
-                    onClick={() => setTemplatePick(t.code)}
-                  >
-                    <div className="text-sm font-semibold">{t.name}</div>
-                    <div className="mt-1 text-xs text-zinc-500">
-                      Độ khó: {t.difficulty} • Thời lượng: {t.duration}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {(t.target || []).map((tg) => (
-                        <Badge key={tg} tone="info">
-                          {tg}
-                        </Badge>
-                      ))}
-                    </div>
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 max-h-[45vh] overflow-auto">
+                {exercises
+                  .filter((t) => {
+                    const q = templateSearch.trim().toLowerCase();
+
+                    // --- 1) Chỉ lọc theo tên ---
+                    const matchSearch = !q || t.title.toLowerCase().includes(q);
+
+                    // --- 2) Lọc theo Lo âu / Trầm cảm ---
+                    const tags = (t.targetSymptoms || []).map((tg) =>
+                      tg.toLowerCase()
+                    );
+                    let matchFilter = true;
+                    if (templateFilter === "lo-au") {
+                      matchFilter = tags.includes("lo âu");
+                    } else if (templateFilter === "tram-cam") {
+                      matchFilter = tags.includes("trầm cảm");
+                    }
+                    return matchSearch && matchFilter;
+                  })
+                  .map((t) => (
+                    <button
+                      key={t._id}
+                      className={`group rounded-2xl border p-4 text-left hover:bg-zinc-50 ${
+                        templatePick === t._id
+                          ? "border-zinc-900"
+                          : "border-zinc-200"
+                      }`}
+                      onClick={() => {
+                        // 👉 Khi chọn mẫu:
+                        // 1) nhớ lại mã template
+                        setTemplatePick(t._id);
+                        // 2) đổ dữ liệu sang form Tự nhập
+                        setCustomTitle(t.title || "");
+                        setCustomDesc(t.content || "");
+                        setCustomDifficulty(convertDifficult(t.difficulty));
+                        setCustomDuration(t.estimatedMinutes || 10);
+                        setCustomMethod(t.method || "");
+                        setCustomAttachments(t.attachments || []);
+                        // 3) chuyển sang tab Tự nhập
+                        setMode("custom");
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="w-full">
+                          <div className="flex  items-center gap-0.5">
+                            <div className="text-sm flex-8 font-semibold w-full truncate">
+                              {t.title}
+                            </div>
+                            <div className="text-xs flex-1.5 flex-nowrap">
+                              <span>{t.estimatedMinutes} m</span>
+                            </div>
+                          </div>
+                          <div className="mt-1 text-xs text-zinc-500">
+                            Độ khó: {convertDifficult(t.difficulty)}
+                          </div>
+                          <div className="mt-1 text-xs text-zinc-500">
+                            Phương pháp :{" "}
+                            <span className="font-semibold">{t.method}</span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {(t.targetSymptoms || []).map((tg) => (
+                              <Badge key={tg} tone="info">
+                                {tg}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
               </div>
             </div>
           )}
 
-          {/* Mode: CUSTOM */}
+          {/* MODE: TỰ NHẬP – sẽ được prefill nếu chọn từ mẫu */}
           {mode === "custom" && (
             <div className="space-y-3">
               <div>
@@ -931,20 +983,31 @@ export default function DoctorPage() {
                 </label>
                 <input
                   type="text"
-                  className="mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                  className="placeholder:text-gray-400 mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
                   placeholder="VD: Nhật ký cảm xúc 3 ngày"
                   value={customTitle}
                   onChange={(e) => setCustomTitle(e.target.value)}
                 />
               </div>
-
+              {/* Hạn nộp */}
+              <div className="pt-1">
+                <label className="block text-sm font-medium">Hạn nộp</label>
+                <input
+                  type="datetime-local"
+                  className="mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                  value={toLocalInputValue(templateDue)}
+                  onChange={(e) =>
+                    setTemplateDue(fromLocalInputValue(e.target.value))
+                  }
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium">
                   Hướng dẫn / Nội dung
                 </label>
                 <textarea
                   rows={4}
-                  className="mt-1 w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-zinc-400"
+                  className="placeholder:text-gray-400 mt-1 w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-zinc-400"
                   placeholder={`VD:
 - Ghi lại 3 cảm xúc nổi bật mỗi ngày
 - Sự kiện kích hoạt
@@ -955,8 +1018,57 @@ export default function DoctorPage() {
                   onChange={(e) => setCustomDesc(e.target.value)}
                 />
               </div>
+              {/* FILE ĐÍNH KÈM */}
+              <div className="mt-3">
+                <label className="block text-sm font-medium mb-1">
+                  File đính kèm
+                </label>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Ô upload có BORDER */}
+                <div className="rounded-xl border border-zinc-300 bg-white p-1.5 pl-3 hover:border-zinc-400 transition-colors">
+                  <input
+                    type="file"
+                    multiple
+                    className="block w-full text-sm"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files);
+                      setCustomAttachments(files);
+                    }}
+                  />
+                </div>
+
+                {/* Danh sách file đã chọn */}
+                {customAttachments.length > 0 && (
+                  <ul className="mt-3 space-y-2">
+                    {customAttachments.map((f, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 hover:bg-zinc-100"
+                      >
+                        {/* Tên file */}
+                        <span className="truncate max-w-[220px] text-sm text-zinc-700">
+                          {f.name}
+                        </span>
+
+                        {/* Nút X xoá */}
+                        <button
+                          onClick={() =>
+                            setCustomAttachments((prev) =>
+                              prev.filter((_, idx) => idx !== i)
+                            )
+                          }
+                          className="ml-3 flex h-6 w-6 items-center justify-center rounded-md border border-zinc-300 text-xs text-zinc-700 hover:bg-white hover:border-zinc-400"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Độ khó */}
                 <div>
                   <label className="block text-sm font-medium">Độ khó</label>
                   <select
@@ -969,32 +1081,51 @@ export default function DoctorPage() {
                     <option>Khó</option>
                   </select>
                 </div>
+
+                {/* Thời lượng */}
                 <div>
                   <label className="block text-sm font-medium">
-                    Thời lượng
+                    Thời lượng (phút)
                   </label>
                   <input
-                    type="text"
-                    className="mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
-                    placeholder="VD: 10–15 phút"
+                    type="number"
+                    min={1}
+                    className="placeholder:text-gray-400 mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                    placeholder="Số phút"
                     value={customDuration}
-                    onChange={(e) => setCustomDuration(e.target.value)}
+                    onChange={(e) => setCustomDuration(Number(e.target.value))}
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium">
-                    Nhóm mục tiêu (tags)
+                    Phương pháp trị liệu
                   </label>
-                  <input
-                    type="text"
+                  <select
                     className="mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
-                    placeholder="VD: lo âu, trầm cảm"
-                    value={customTargets}
-                    onChange={(e) => setCustomTargets(e.target.value)}
-                  />
-                  <div className="mt-1 text-[11px] text-zinc-500">
-                    Nhiều tag cách nhau bởi dấu phẩy.
-                  </div>
+                    value={customMethod}
+                    onChange={(e) => setCustomMethod(e.target.value)}
+                  >
+                    {THERAPY_METHODS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 👉 NEW: Tần suất làm bài */}
+                <div>
+                  <label className="block text-sm font-medium">Tần suất</label>
+                  <select
+                    className="mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                    value={customFrequency}
+                    onChange={(e) => setCustomFrequency(e.target.value)}
+                  >
+                    <option value="once">Làm 1 lần</option>
+                    <option value="daily">Hàng ngày</option>
+                    <option value="weekly">Hàng tuần</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -1043,8 +1174,8 @@ export default function DoctorPage() {
               }
             >
               {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+                <option key={p._id} value={p._id}>
+                  {p.accountId.fullName}
                 </option>
               ))}
             </select>
@@ -1110,6 +1241,7 @@ function labelOf(key) {
 function Dashboard({
   stats,
   patients,
+  rooms,
   calls,
   callRequests,
   setNav,
@@ -1123,20 +1255,37 @@ function Dashboard({
         .slice(0, 6),
     [calls]
   );
-  const recentMsgs = useMemo(
-    () =>
-      patients
-        .filter((p) => (p.messages || []).length)
-        .map((p) => ({ ...p, lastMsg: p.messages[p.messages.length - 1] }))
-        .sort((a, b) => +new Date(b.lastMsg.at) - +new Date(a.lastMsg.at))
-        .slice(0, 6),
-    [patients]
-  );
+  const recentMsgs = useMemo(() => {
+    if (!patients?.length || !rooms?.length) return [];
+
+    // Tạo map: userId -> room
+    const roomMap = new Map(rooms.map((r) => [String(r.userId), r]));
+
+    return patients
+      .map((p) => {
+        const room = roomMap.get(String(p._id));
+        if (!room || !room.lastMessage) return null;
+
+        return {
+          ...p,
+          lastMsgText: room.lastMessage,
+          lastMsgAt: room.lastMessageAt || room.updatedAt,
+        };
+      })
+      .filter(Boolean) // bỏ mấy thằng null
+      .sort(
+        (a, b) =>
+          new Date(b.lastMsgAt).getTime() - new Date(a.lastMsgAt).getTime()
+      )
+      .slice(0, 6);
+  }, [patients, rooms]);
 
   const riskPatients = useMemo(
     () =>
       patients.filter(
-        (p) => p.latestTests?.PHQ9 >= 20 || p.latestTests?.GAD7 >= 15
+        (p) =>
+          p.testHistory.at(-2).totalScore >= 15 ||
+          p.testHistory.at(-1).totalScore >= 15
       ),
     [patients]
   );
@@ -1164,16 +1313,16 @@ function Dashboard({
           hint="Trong 24h"
         />
         <StatCard
-          icon={CalendarClock}
-          label="Yêu cầu chờ"
-          value={stats.pendingReq}
-          hint="Chưa xử lý"
+          icon={ClipboardList}
+          label="Doanh thu tháng"
+          value={stats.homeworkDueToday}
+          hint={"Tháng " + new Date().getMonth()}
         />
         <StatCard
-          icon={ClipboardList}
-          label="Bài tập đến hạn"
-          value={stats.homeworkDueToday}
-          hint="Hôm nay"
+          icon={DollarSign}
+          label="Tổng doanh thu"
+          value={stats.pendingReq}
+          hint="Chưa xử lý"
         />
       </div>
 
@@ -1237,23 +1386,24 @@ function Dashboard({
             )}
             {recentMsgs.map((p) => (
               <button
-                key={p.id}
+                key={p._id}
                 className="flex w-full items-center gap-3 rounded-xl border p-3 text-left hover:bg-zinc-50"
                 onClick={() => {
-                  setActivePatientId(p.id);
+                  setActivePatientId(p._id);
                   setNav("messages");
                 }}
               >
-                <Avatar name={p.name} />
+                <Avatar name={p.accountId.fullName} />
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{p.name}</div>
-                  <div className="truncate text-xs text-zinc-500">
-                    {p.lastMsg.sender === "doctor" ? "Bạn: " : "BN: "}
-                    {p.lastMsg.text}
+                  <div className="truncate text-sm font-medium">
+                    {p.accountId.fullName}
+                  </div>
+                  <div className="text-[10px] text-zinc-400">
+                    {p.lastMsgAt ? prettyTime(p.lastMsgAt) : ""}
                   </div>
                 </div>
-                <div className="ml-auto text-xs text-zinc-400">
-                  {fmtTime(p.lastMsg.at)}
+                <div className="truncate text-xs text-zinc-500">
+                  {p.lastMsgText}
                 </div>
               </button>
             ))}
@@ -1275,44 +1425,58 @@ function Dashboard({
               />
             )}
             {riskPatients.map((p) => (
-              <div key={p.id} className="rounded-xl border p-3">
-                <div className="flex items-center gap-3">
-                  <Avatar name={p.name} />
-                  <div>
-                    <div className="text-sm font-medium">{p.name}</div>
-                    <div className="text-xs text-zinc-500">
-                      PHQ-9 {p.latestTests.PHQ9} • GAD-7 {p.latestTests.GAD7}
+              <div key={p._id} className="rounded-xl border p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-3">
+                    <Avatar name={p.accountId.fullName} />
+                    <div>
+                      <div className="text-sm font-medium">
+                        {p.accountId.fullName}
+                      </div>
+                      <div className="text-xs text-zinc-500">
+                        PHQ-9 {p.testHistory.at(-2).totalScore} • GAD-7{" "}
+                        {p.testHistory.at(-1).totalScore}
+                      </div>
                     </div>
                   </div>
-                  <Badge tone="danger" />
+                  <button
+                    key={p._id}
+                    className="flex items-center rounded-xl border py-1 px-2.5 text-left hover:bg-zinc-50"
+                    onClick={() => {
+                      setActivePatientId(p._id);
+                      setNav("patients");
+                    }}
+                  >
+                    Quản lý
+                  </button>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <Progress
-                      value={p.latestTests.PHQ9}
+                      value={p.testHistory.at(-2).totalScore}
                       max={27}
                       label="PHQ-9"
                     />
                     <div
                       className={`mt-2 inline-block rounded-full border px-2 py-1 ${toneToClass(
-                        classifyPHQ9(p.latestTests.PHQ9).tone
+                        classifyPHQ9(p.testHistory.at(-2).totalScore).tone
                       )}`}
                     >
-                      {classifyPHQ9(p.latestTests.PHQ9).label}
+                      {classifyPHQ9(p.testHistory.at(-2).totalScore).label}
                     </div>
                   </div>
                   <div>
                     <Progress
-                      value={p.latestTests.GAD7}
+                      value={p.testHistory.at(-1).totalScore}
                       max={21}
                       label="GAD-7"
                     />
                     <div
                       className={`mt-2 inline-block rounded-full border px-2 py-1 ${toneToClass(
-                        classifyGAD7(p.latestTests.GAD7).tone
+                        classifyGAD7(p.testHistory.at(-1).totalScore).tone
                       )}`}
                     >
-                      {classifyGAD7(p.latestTests.GAD7).label}
+                      {classifyGAD7(p.testHistory.at(-1).totalScore).label}
                     </div>
                   </div>
                 </div>
@@ -1344,18 +1508,27 @@ function StatCard({ icon: Icon, label, value, hint }) {
 
 // ---------------------------- Patients -------------------------------
 function PatientsView({
-  patients,
-  setPatients,
-  activePatientId,
+  patients = [],
+  // setPatients,
+  assignments = [],
+  activePatientId = patients[0]?._id || null,
   setActivePatientId,
   onAssign,
   onSchedule,
 }) {
   const ap = useMemo(
-    () => patients.find((p) => p.id === activePatientId) || patients[0] || null,
+    () =>
+      patients.find((p) => p._id === activePatientId) || patients[0] || null,
     [patients, activePatientId]
   );
 
+  const ass = useMemo(
+    () => assignments.filter((p) => p.userId === activePatientId),
+    [assignments, activePatientId]
+  );
+  console.log(assignments);
+  console.log(activePatientId);
+  console.log(ass);
   // Dropdown chọn bệnh nhân (phải ngoài cùng) + tìm kiếm bên trong
   const [openPatientMenu, setOpenPatientMenu] = useState(false);
   const [patientQuery, setPatientQuery] = useState("");
@@ -1365,7 +1538,7 @@ function PatientsView({
     if (!q) return patients;
     return patients.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
+        p.accountId.fullName.toLowerCase().includes(q) ||
         (p.tags || []).some((t) => (t || "").toLowerCase().includes(q))
     );
   }, [patientQuery, patients]);
@@ -1388,193 +1561,52 @@ function PatientsView({
   // Cập nhật phản hồi
   const submitFeedback = () => {
     if (!ap || !feedbackA) return;
-    setPatients((ps) =>
-      ps.map((p) =>
-        p.id === ap.id
-          ? {
-              ...p,
-              assignments: (p.assignments || []).map((a) =>
-                a.id === feedbackA.id
-                  ? {
-                      ...a,
-                      feedback: {
-                        text: feedbackText.trim(),
-                        at: new Date().toISOString(),
-                      },
-                    }
-                  : a
-              ),
-            }
-          : p
-      )
-    );
+
     setFeedbackText("");
     setFeedbackA(null);
   };
-
-  // Lưu sửa giao bài (khi CHƯA nộp)
-  const saveEdit = () => {
-    if (!ap || !editA) return;
-    setPatients((ps) =>
-      ps.map((p) =>
-        p.id === ap.id
-          ? {
-              ...p,
-              assignments: (p.assignments || []).map((a) =>
-                a.id === editA.id
-                  ? {
-                      ...a,
-                      title: editTitle.trim() || a.title,
-                      dueDate: fromLocalInputValue(editDue),
-                    }
-                  : a
-              ),
-            }
-          : p
-      )
-    );
-    setEditA(null);
-  };
-
   return (
     <div className="space-y-4">
-      {/* Header: info + actions + dropdown chọn bệnh nhân ở phải ngoài cùng */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="ml-auto relative flex items-center gap-2">
-          <IconBtn icon={NotebookPen} onClick={onAssign}>
-            Giao bài tập
-          </IconBtn>
-          <IconBtn icon={PhoneCall} onClick={onSchedule}>
-            Lên lịch gọi
-          </IconBtn>
-          {ap && (
-            <IconBtn
-              icon={MessageSquareText}
-              onClick={() => setActivePatientId(ap.id)}
-            >
-              Mở chat
-            </IconBtn>
-          )}
-
-          {ap ? (
-            <div className="flex items-center gap-3">
-              {/* Dropdown chọn bệnh nhân */}
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-3 py-2 text-sm hover:bg-zinc-50"
-                onClick={() => {
-                  setOpenPatientMenu((v) => !v);
-                  setPatientQuery("");
-                }}
-              >
-                <Avatar name={ap.name} />
-                <div>
-                  <div className="text-base font-semibold">{ap.name}</div>
-                  <div className="text-xs text-zinc-500">
-                    {ap.gender} • {ap.age}t • {(ap.tags || []).join(" • ")}
-                  </div>
-                </div>
-                <ChevronDown className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="text-sm text-zinc-500">Chưa chọn bệnh nhân</div>
-          )}
-
-          {openPatientMenu && (
-            <div
-              className="absolute right-0 top-15 z-20 w-[360px] max-h-[70vh] overflow-auto rounded-xl border bg-white shadow-lg"
-              onMouseLeave={() => setOpenPatientMenu(false)}
-            >
-              <div className="sticky top-0 bg-white p-2 border-b">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                  <input
-                    autoFocus
-                    value={patientQuery}
-                    onChange={(e) => setPatientQuery(e.target.value)}
-                    placeholder="Tìm theo tên, tag…"
-                    className="h-10 w-full rounded-lg border border-zinc-200 pl-9 pr-3 text-sm outline-none focus:border-zinc-400"
-                  />
-                </div>
-              </div>
-              <div className="p-2">
-                {patientFiltered.length === 0 && (
-                  <div className="p-3 text-xs text-zinc-500">
-                    Không tìm thấy kết quả
-                  </div>
-                )}
-                {patientFiltered.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      setActivePatientId(p.id);
-                      setOpenPatientMenu(false);
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-zinc-50 ${
-                      ap?.id === p.id ? "bg-zinc-50" : ""
-                    }`}
-                  >
-                    <Avatar name={p.name} />
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">
-                        {p.name}
-                      </div>
-                      <div className="truncate text-[11px] text-zinc-500">
-                        {p.gender} • {p.age}t • {(p.tags || []).join(", ")}
-                      </div>
-                    </div>
-                    {p.unread > 0 && (
-                      <span className="ml-auto text-xs">
-                        <Badge tone="info">{p.unread}</Badge>
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Nội dung chính */}
       {!ap ? (
-        <Empty icon={Users} title="Chưa chọn bệnh nhân" />
+        <Empty icon={Users} title="Chưa có bệnh nhân nào" />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Tests */}
           <div className="rounded-2xl border bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Kết quả bài test</h3>
+              <h3 className="text-sm font-semibold">
+                Kết quả bài test gần nhất
+              </h3>
               <Badge tone="info">PHQ-9 • GAD-7</Badge>
             </div>
             <div className="space-y-3">
               <div>
                 <Progress
-                  value={ap.latestTests?.PHQ9 ?? 0}
+                  value={ap.testHistory.at(-2).totalScore ?? 0}
                   max={27}
                   label="PHQ-9"
                 />
                 <div
                   className={`mt-2 inline-block rounded-full border px-2 py-1 text-xs ${toneToClass(
-                    classifyPHQ9(ap.latestTests?.PHQ9 ?? 0).tone
+                    classifyPHQ9(ap.testHistory.at(-2).totalScore ?? 0).tone
                   )}`}
                 >
-                  {classifyPHQ9(ap.latestTests?.PHQ9 ?? 0).label}
+                  {classifyPHQ9(ap.testHistory.at(-2).totalScore ?? 0).label}
                 </div>
               </div>
               <div>
                 <Progress
-                  value={ap.latestTests?.GAD7 ?? 0}
+                  value={ap.testHistory.at(-1).totalScore ?? 0}
                   max={21}
                   label="GAD-7"
                 />
                 <div
                   className={`mt-2 inline-block rounded-full border px-2 py-1 text-xs ${toneToClass(
-                    classifyGAD7(ap.latestTests?.GAD7 ?? 0).tone
+                    classifyGAD7(ap.testHistory.at(-1).totalScore ?? 0).tone
                   )}`}
                 >
-                  {classifyGAD7(ap.latestTests?.GAD7 ?? 0).label}
+                  {classifyGAD7(ap.testHistory.at(-1).totalScore ?? 0).label}
                 </div>
               </div>
             </div>
@@ -1584,86 +1616,96 @@ function PatientsView({
           <div className="rounded-2xl border bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold">Bài tập trị liệu</h3>
-              <IconBtn icon={NotebookPen} onClick={onAssign}>
-                Giao bài
-              </IconBtn>
+
+              <div className="gap-2 flex">
+                <IconBtn icon={NotebookPen} onClick={onAssign}>
+                  Giao bài tập
+                </IconBtn>
+                <IconBtn icon={PhoneCall} onClick={onSchedule}>
+                  Lên lịch gọi
+                </IconBtn>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              {(ap.assignments || []).length === 0 && (
+            <div className="space-y-2 max-h-[330px] overflow-y-auto">
+              {(ass || []).length === 0 ? (
                 <Empty
                   icon={ClipboardList}
                   title="Chưa có bài tập"
                   hint="Giao bài từ danh sách mẫu"
                 />
+              ) : (
+                (ass || []).map((a) => {
+                  const isSubmitted = !!a.submission?.submittedAt;
+                  return (
+                    <div
+                      key={a.id}
+                      className="flex items-start gap-3 rounded-xl border p-3"
+                    >
+                      <div className="grid h-8 w-8 place-items-center rounded-lg bg-zinc-900 text-white">
+                        <ClipboardList className="h-4 w-4" />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="truncate text-sm font-semibold">
+                            {a.title}
+                          </div>
+                          <Badge tone={isSubmitted ? "info" : "warn"}>
+                            {isSubmitted ? "Đã nộp" : "Chưa nộp"}
+                          </Badge>
+                        </div>
+
+                        <div className="mt-1 text-xs text-zinc-500">
+                          Hạn: {fmtDateTime(a.dueDate || a.due)}{" "}
+                          {isSubmitted && a.submission?.submittedAt
+                            ? `• Nộp: ${fmtDateTime(a.submission.submittedAt)}`
+                            : ""}
+                        </div>
+
+                        {!!a.feedback?.text && (
+                          <div className="mt-2 rounded-lg border bg-zinc-50 p-2 text-xs text-zinc-700">
+                            <span className="font-medium">Phản hồi:</span>{" "}
+                            {a.feedback.text}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+                        {isSubmitted ? (
+                          <>
+                            <IconBtn
+                              icon={FileText}
+                              onClick={() => setViewA(a)}
+                            >
+                              Chi tiết
+                            </IconBtn>
+                            <IconBtn
+                              icon={NotebookPen}
+                              onClick={() => {
+                                setFeedbackA(a);
+                                setFeedbackText(a.feedback?.text || "");
+                              }}
+                            >
+                              Phản hồi
+                            </IconBtn>
+                          </>
+                        ) : (
+                          <IconBtn icon={Pencil} onClick={() => openEdit(a)}>
+                            Sửa
+                          </IconBtn>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               )}
-
-              {(ap.assignments || []).map((a) => {
-                const isSubmitted = !!a.submission?.submittedAt;
-                return (
-                  <div
-                    key={a.id}
-                    className="flex items-start gap-3 rounded-xl border p-3"
-                  >
-                    <div className="grid h-8 w-8 place-items-center rounded-lg bg-zinc-900 text-white">
-                      <ClipboardList className="h-4 w-4" />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="truncate text-sm font-semibold">
-                          {a.title}
-                        </div>
-                        <Badge tone={isSubmitted ? "info" : "warn"}>
-                          {isSubmitted ? "Đã nộp" : "Chưa nộp"}
-                        </Badge>
-                      </div>
-
-                      <div className="mt-1 text-xs text-zinc-500">
-                        Hạn: {fmtDateTime(a.dueDate || a.due)}{" "}
-                        {isSubmitted && a.submission?.submittedAt
-                          ? `• Nộp: ${fmtDateTime(a.submission.submittedAt)}`
-                          : ""}
-                      </div>
-
-                      {!!a.feedback?.text && (
-                        <div className="mt-2 rounded-lg border bg-zinc-50 p-2 text-xs text-zinc-700">
-                          <span className="font-medium">Phản hồi:</span>{" "}
-                          {a.feedback.text}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
-                      {isSubmitted ? (
-                        <>
-                          <IconBtn icon={FileText} onClick={() => setViewA(a)}>
-                            Chi tiết
-                          </IconBtn>
-                          <IconBtn
-                            icon={NotebookPen}
-                            onClick={() => {
-                              setFeedbackA(a);
-                              setFeedbackText(a.feedback?.text || "");
-                            }}
-                          >
-                            Phản hồi
-                          </IconBtn>
-                        </>
-                      ) : (
-                        <IconBtn icon={Pencil} onClick={() => openEdit(a)}>
-                          Sửa
-                        </IconBtn>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
 
           {/* Notes */}
-          <div className="md:col-span-2 rounded-2xl border bg-white p-4">
+          <TestHistoryChart history={ap.testHistory || []} />
+          <div className="md:col-span-1 rounded-2xl border bg-white p-4">
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-semibold">Ghi chú</h3>
               <Badge tone="default">
@@ -1673,13 +1715,13 @@ function PatientsView({
             <textarea
               className="h-28 w-full resize-none rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-zinc-400"
               defaultValue={ap.notes}
-              onBlur={(e) =>
-                setPatients((ps) =>
-                  ps.map((p) =>
-                    p.id === ap.id ? { ...p, notes: e.target.value } : p
-                  )
-                )
-              }
+              // onBlur={(e) =>
+              //   setPatients((ps) =>
+              //     ps.map((p) =>
+              //       p._id === ap.id ? { ...p, notes: e.target.value } : p
+              //     )
+              //   )
+              // }
             />
           </div>
         </div>
@@ -1835,26 +1877,172 @@ function PatientsView({
     </div>
   );
 }
+function TestHistoryChart({ history = [] }) {
+  // Tách lịch sử PHQ-9 & GAD-7
+  const phq = (history || [])
+    .filter((t) => t?.code === "PHQ-9")
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  const gad = (history || [])
+    .filter((t) => t?.code === "GAD-7")
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  if (!phq.length && !gad.length) {
+    return (
+      <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-500">
+        Chưa có lịch sử bài test để vẽ biểu đồ.
+      </div>
+    );
+  }
+
+  const width = 280;
+  const height = 140;
+  const padX = 24;
+  const padY = 16;
+  const innerW = width - padX * 2;
+  const innerH = height - padY * 2;
+
+  const buildPath = (points, maxScore) => {
+    if (!points.length) return "";
+    return points
+      .map((p, idx) => {
+        const x =
+          padX +
+          (points.length === 1
+            ? innerW / 2
+            : (innerW * idx) / (points.length - 1));
+        const y =
+          padY +
+          innerH -
+          Math.max(0, Math.min(1, p.totalScore / maxScore)) * innerH;
+        return `${idx === 0 ? "M" : "L"} ${x} ${y}`;
+      })
+      .join(" ");
+  };
+
+  const phqPath = buildPath(phq, 27);
+  const gadPath = buildPath(gad, 21);
+
+  const buildDots = (points, maxScore) =>
+    points.map((p, idx) => {
+      const x =
+        padX +
+        (points.length === 1
+          ? innerW / 2
+          : (innerW * idx) / (points.length - 1));
+      const y =
+        padY +
+        innerH -
+        Math.max(0, Math.min(1, p.totalScore / maxScore)) * innerH;
+      return { x, y, score: p.totalScore };
+    });
+
+  const phqDots = buildDots(phq, 27);
+  const gadDots = buildDots(gad, 21);
+
+  return (
+    <div className="md:col-span-1 rounded-2xl border bg-white p-4">
+      <div className="mb-2 flex items-center justify-between text-xs text-zinc-600">
+        <span>Diễn biến mức độ theo thời gian</span>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-4 rounded-full bg-emerald-500" />
+            <span>PHQ-9</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-4 rounded-full bg-sky-500" />
+            <span>GAD-7</span>
+          </span>
+        </div>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full"
+        aria-hidden="true"
+      >
+        {/* Trục X & Y nhẹ nhàng */}
+        <line
+          x1={padX}
+          y1={padY + innerH}
+          x2={padX + innerW}
+          y2={padY + innerH}
+          className="stroke-zinc-200"
+          strokeWidth="1"
+        />
+        <line
+          x1={padX}
+          y1={padY}
+          x2={padX}
+          y2={padY + innerH}
+          className="stroke-zinc-200"
+          strokeWidth="1"
+        />
+
+        {/* Đường PHQ-9 */}
+        {phqPath && (
+          <path
+            d={phqPath}
+            fill="none"
+            stroke="#059669" // emerald-500
+            strokeWidth="2"
+          />
+        )}
+
+        {/* Đường GAD-7 */}
+        {gadPath && (
+          <path
+            d={gadPath}
+            fill="none"
+            stroke="#0ea5e9" // sky-500
+            strokeWidth="2"
+          />
+        )}
+
+        {/* Dots PHQ */}
+        {phqDots.map((d, idx) => (
+          <g key={`phq-dot-${idx}`}>
+            <circle cx={d.x} cy={d.y} r={3} fill="#059669" />
+          </g>
+        ))}
+
+        {/* Dots GAD */}
+        {gadDots.map((d, idx) => (
+          <g key={`gad-dot-${idx}`}>
+            <circle cx={d.x} cy={d.y} r={3} fill="#0ea5e9" />
+          </g>
+        ))}
+      </svg>
+      {/* Nhãn nhỏ phía dưới: số lần test */}
+      <div className="mt-1 text-[11px] text-zinc-500">
+        Lần test PHQ-9: {phq.length} • Lần test GAD-7: {gad.length}
+      </div>
+    </div>
+  );
+}
 
 function MessagesView({
   patients,
-  setPatients,
-  activePatientId,
-  setActivePatientId,
-  onSend,
+  rooms,
+  activeId,
   onDoctorComplete, // optional
   onRespondComplete, // optional
 }) {
+  const [activePatientId, setActivePatientId] = useState(
+    activeId || patients[0]._id
+  );
+  const { messages, fetchMessages, sendMessage } = useUserContext();
   const [text, setText] = useState("");
-  const ap = patients.find((p) => p.id === activePatientId) || patients[0];
-  const msgs = ap?.messages || [];
+  const [room, setRoom] = useState([]);
+  const ap = patients.find((p) => p._id === activePatientId) || patients[0];
+  const msgs = messages || [];
 
   // Mark read khi mở hội thoại
   useEffect(() => {
-    setPatients((ps) =>
-      ps.map((p) => (p.id === ap?.id ? { ...p, unread: 0 } : p))
-    );
-  }, [ap?.id, setPatients]);
+    const r = rooms.find((r) => r.userId === ap._id);
+
+    setRoom(r);
+    fetchMessages(r._id);
+  }, [ap?._id]);
 
   const isCompleted = ap?.chatStatus === "completed";
   const pendingUserRequest =
@@ -1869,30 +2057,30 @@ function MessagesView({
     );
     if (!ok) return;
 
-    setPatients((ps) =>
-      ps.map((p) => {
-        if (p.id !== ap.id) return p;
-        const sysMsg = {
-          id: Math.random().toString(36).slice(2),
-          sender: "system",
-          text: "Bác sĩ đã đánh dấu HOÀN THÀNH khóa điều trị. Cảm ơn bạn đã trao đổi!",
-          at: new Date().toISOString(),
-        };
-        return {
-          ...p,
-          chatStatus: "completed",
-          // Nếu trước đó có pending từ user thì kết thúc luôn yêu cầu
-          completeRequest: p.completeRequest
-            ? { ...p.completeRequest, status: "accepted" }
-            : {
-                from: "doctor",
-                status: "accepted",
-                at: new Date().toISOString(),
-              },
-          messages: [...(p.messages || []), sysMsg],
-        };
-      })
-    );
+    // setPatients((ps) =>
+    //   ps.map((p) => {
+    //     if (p._id !== ap.id) return p;
+    //     const sysMsg = {
+    //       id: Math.random().toString(36).slice(2),
+    //       sender: "system",
+    //       text: "Bác sĩ đã đánh dấu HOÀN THÀNH khóa điều trị. Cảm ơn bạn đã trao đổi!",
+    //       at: new Date().toISOString(),
+    //     };
+    //     return {
+    //       ...p,
+    //       chatStatus: "completed",
+    //       // Nếu trước đó có pending từ user thì kết thúc luôn yêu cầu
+    //       completeRequest: p.completeRequest
+    //         ? { ...p.completeRequest, status: "accepted" }
+    //         : {
+    //             from: "doctor",
+    //             status: "accepted",
+    //             at: new Date().toISOString(),
+    //           },
+    //       messages: [...(p.messages || []), sysMsg],
+    //     };
+    //   })
+    // );
 
     // Callback ra ngoài (gửi backend)
     onDoctorComplete?.({ patientId: ap.id });
@@ -1908,32 +2096,32 @@ function MessagesView({
     );
     if (!ok) return;
 
-    setPatients((ps) =>
-      ps.map((p) => {
-        if (p.id !== ap.id) return p;
+    // setPatients((ps) =>
+    //   ps.map((p) => {
+    //     if (p._id !== ap.id) return p;
 
-        const accepted = decision === "accept";
-        const sysMsg = {
-          id: Math.random().toString(36).slice(2),
-          sender: "system",
-          text: accepted
-            ? "Yêu cầu hoàn thành từ người dùng đã được CHẤP NHẬN. Phiên chat kết thúc."
-            : "Yêu cầu hoàn thành từ người dùng đã bị TỪ CHỐI. Bạn có thể tiếp tục trao đổi.",
-          at: new Date().toISOString(),
-        };
+    //     const accepted = decision === "accept";
+    //     const sysMsg = {
+    //       id: Math.random().toString(36).slice(2),
+    //       sender: "system",
+    //       text: accepted
+    //         ? "Yêu cầu hoàn thành từ người dùng đã được CHẤP NHẬN. Phiên chat kết thúc."
+    //         : "Yêu cầu hoàn thành từ người dùng đã bị TỪ CHỐI. Bạn có thể tiếp tục trao đổi.",
+    //       at: new Date().toISOString(),
+    //     };
 
-        return {
-          ...p,
-          chatStatus: accepted ? "completed" : p.chatStatus || "active",
-          completeRequest: {
-            ...(p.completeRequest || { from: "user" }),
-            status: accepted ? "accepted" : "rejected",
-            at: new Date().toISOString(),
-          },
-          messages: [...(p.messages || []), sysMsg],
-        };
-      })
-    );
+    //     return {
+    //       ...p,
+    //       chatStatus: accepted ? "completed" : p.chatStatus || "active",
+    //       completeRequest: {
+    //         ...(p.completeRequest || { from: "user" }),
+    //         status: accepted ? "accepted" : "rejected",
+    //         at: new Date().toISOString(),
+    //       },
+    //       messages: [...(p.messages || []), sysMsg],
+    //     };
+    //   })
+    // );
 
     onRespondComplete?.({ patientId: ap.id, decision });
   };
@@ -1946,17 +2134,19 @@ function MessagesView({
         <div className="space-y-2">
           {patients.map((p) => (
             <button
-              key={p.id}
-              onClick={() => setActivePatientId(p.id)}
+              key={p._id}
+              onClick={() => setActivePatientId(p._id)}
               className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left hover:bg-zinc-50 ${
-                ap?.id === p.id ? "border-zinc-900" : "border-zinc-200"
+                ap?._id === p._id ? "border-zinc-900" : "border-zinc-200"
               }`}
             >
-              <Avatar name={p.name} />
+              <Avatar name={p.accountId.fullName} />
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium">{p.name}</div>
+                <div className="truncate text-sm font-medium">
+                  {p.accountId.fullName}
+                </div>
                 <div className="truncate text-xs text-zinc-500">
-                  {(p.messages || [])[p.messages?.length - 1]?.text || "—"}
+                  {rooms.find((r) => r.userId === p._id).lastMessage || "—"}
                 </div>
               </div>
               {p.unread > 0 && <Badge tone="info">{p.unread}</Badge>}
@@ -1969,8 +2159,8 @@ function MessagesView({
       <div className="lg:col-span-2 rounded-2xl border bg-white">
         {/* Header */}
         <div className="flex items-center gap-3 border-b p-4">
-          <Avatar name={ap?.name} />
-          <div className="text-sm font-semibold">{ap?.name}</div>
+          <Avatar name={ap.accountId.fullName} />
+          <div className="text-sm font-semibold">{ap.accountId.fullName}</div>
           {isCompleted ? (
             <Badge tone="default">Đã hoàn thành</Badge>
           ) : (
@@ -2024,38 +2214,40 @@ function MessagesView({
           ) : (
             <div className="space-y-2">
               {msgs.map((m) => {
-                if (m.sender === "system") {
+                if (m.senderType === "system") {
                   return (
                     <div
-                      key={m.id}
+                      key={m._id}
                       className="mx-auto max-w-[80%] text-center text-xs text-zinc-600"
                     >
                       <div className="inline-block rounded-lg border border-zinc-200 bg-white px-3 py-1.5">
-                        {m.text}
+                        {m.content}
                       </div>
                       <div className="mt-1 text-[10px] text-zinc-400">
-                        {fmtTime(m.at)}
+                        {prettyTime(m.createdAt)}
                       </div>
                     </div>
                   );
                 }
                 return (
                   <div
-                    key={m.id}
+                    key={m._id}
                     className={`flex ${
-                      m.sender === "doctor" ? "justify-end" : "justify-start"
+                      m.senderType === "doctor"
+                        ? "justify-end"
+                        : "justify-start"
                     }`}
                   >
                     <div
                       className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-                        m.sender === "doctor"
+                        m.senderType === "doctor"
                           ? "bg-zinc-900 text-white"
                           : "bg-zinc-100"
                       }`}
                     >
-                      <div>{m.text}</div>
+                      <div>{m.content}</div>
                       <div className="mt-1 text-[10px] opacity-70">
-                        {fmtTime(m.at)}
+                        {prettyTime(m.createdAt)}
                       </div>
                     </div>
                   </div>
@@ -2067,10 +2259,11 @@ function MessagesView({
 
         {/* Composer (vẫn cho phép chat nếu chưa completed) */}
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             if (!ap || !text.trim()) return;
-            onSend({ patientId: ap.id, text });
+            await sendMessage({ roomId: room._id, content: text });
+
             setText("");
           }}
           className="flex items-center gap-2 border-t p-3"
@@ -2203,7 +2396,7 @@ function CalendarView({
     if (!q) return patients;
     return patients.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
+        p.accountId.fullName.toLowerCase().includes(q) ||
         (p.tags || []).some((t) => (t || "").toLowerCase().includes(q))
     );
   }, [patientQuery, patients]);
@@ -2372,19 +2565,21 @@ function CalendarView({
               ) : (
                 filteredPatients.map((p) => (
                   <button
-                    key={p.id}
-                    onClick={() => setPickedPatientId(p.id)}
+                    key={p._id}
+                    onClick={() => setPickedPatientId(p._id)}
                     className={`flex w-full items-center gap-3 px-3 py-2 text-left ${
-                      pickedPatientId === p.id ? "bg-zinc-200" : ""
+                      pickedPatientId === p._id ? "bg-zinc-200" : ""
                     }`}
                   >
-                    <Avatar name={p.name} />
+                    <Avatar name={p.accountId.fullName} />
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">
-                        {p.name}
+                        {p.accountId.fullName}
                       </div>
                       <div className="truncate text-[11px] text-zinc-500">
-                        {p.gender} • {p.age}t • {(p.tags || []).join(", ")}
+                        {p.accountId.gender} •{" "}
+                        {formatAge(p.accountId.birthDate)}t •{" "}
+                        {p.dominantSymptom}
                       </div>
                     </div>
                   </button>
@@ -2447,7 +2642,7 @@ function CalendarCell({ date, hour, calls, patients, onJoinCall }) {
               className="flex flex-col justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-2 gap-1"
             >
               <div className="font-medium text-emerald-900 truncate">
-                {p.name}
+                {p.accountId.fullName}
               </div>
               <div className="flex items-center justify-between flex-col">
                 <div className="text-[11px] text-emerald-800">
@@ -2473,130 +2668,537 @@ function CalendarCell({ date, hour, calls, patients, onJoinCall }) {
 
 // ---------------------------- Homework --------------------------------
 function HomeworkView({
-  patients,
-  setPatients,
+  assignments, // mảng HomeworkAssignment từ backend
+  patients, // mảng bệnh nhân để map userId -> tên
+  activePatientId = patients[0]._id, // id bệnh nhân đang chọn
   onAssignOpen,
-  onView, // optional: (assignment) => void
-  onFeedback, // optional: (assignment) => void
-  onEdit, // optional: (assignment) => void
+  onUpdate, // optional: async (id, payload) => ...
 }) {
-  const all = useMemo(
-    () =>
-      (patients || []).flatMap((p) =>
-        (p.assignments || []).map((a) => ({
-          ...a,
-          patientId: p.id,
-          patientName: p.name,
-        }))
-      ),
-    [patients]
-  );
-
   const [q, setQ] = useState("");
+
+  // Bệnh nhân đang chọn
+  const ap = useMemo(() => {
+    return (
+      patients.find((p) => String(p._id) === String(activePatientId)) ||
+      patients[0]
+    );
+  }, [patients, activePatientId]);
+
+  // Danh sách bài tập của bệnh nhân đang chọn
+  const ass = useMemo(() => {
+    return (assignments || []).filter(
+      (a) => String(a.userId) === String(activePatientId)
+    );
+  }, [assignments, activePatientId]);
+
+  // Filter theo title
   const filtered = useMemo(
     () =>
-      all.filter(
-        (a) =>
-          (a.title || "").toLowerCase().includes(q.toLowerCase()) ||
-          (a.patientName || "").toLowerCase().includes(q.toLowerCase())
-      ),
-    [all, q]
+      (ass || []).filter((a) => {
+        const title = (a.title || "").toLowerCase();
+        const query = q.toLowerCase();
+        return title.includes(query);
+      }),
+    [ass, q]
   );
 
-  const isSubmitted = (a) =>
-    a.submitted === true ||
-    a.status === "đã nộp" ||
-    a.status === "nộp bài" ||
-    a.status === "submitted";
+  // -------- ENUM & helper --------
+  const isSubmitted = (a) => a.status === "completed";
 
+  const statusLabel = (status) => {
+    switch (status) {
+      case "assigned":
+        return "Đã giao";
+      case "in_progress":
+        return "Đang làm";
+      case "completed":
+        return "Hoàn thành";
+      case "overdue":
+        return "Quá hạn";
+      default:
+        return "Không rõ";
+    }
+  };
+
+  const statusTone = (status) => {
+    switch (status) {
+      case "completed":
+        return "success";
+      case "overdue":
+        return "danger";
+      case "in_progress":
+        return "info";
+      case "assigned":
+      default:
+        return "warn";
+    }
+  };
+
+  const freqLabel = (f) => {
+    switch (f) {
+      case "once":
+        return "Một lần";
+      case "daily":
+        return "Hàng ngày";
+      case "weekly":
+        return "Hàng tuần";
+      default:
+        return "—";
+    }
+  };
+
+  const methodLabel = (m) => m || "Không rõ";
+
+  // --------- STATE cho popup xem & sửa ---------
+  const [viewA, setViewA] = useState(null); // bài đang xem chi tiết
+  const [editA, setEditA] = useState(null); // bài đang chỉnh sửa
+
+  const [editTitle, setEditTitle] = useState("");
+  const [editMethod, setEditMethod] = useState("");
+  const [editDifficulty, setEditDifficulty] = useState("medium");
+  const [editFrequency, setEditFrequency] = useState("daily");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editEstimatedMinutes, setEditEstimatedMinutes] = useState("");
+  const [editContent, setEditContent] = useState("");
+
+  const toLocalInputValue = (d) => {
+    if (!d) return "";
+    const date = new Date(d);
+    const pad = (n) => String(n).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    const mm = pad(date.getMonth() + 1);
+    const dd = pad(date.getDate());
+    const hh = pad(date.getHours());
+    const mi = pad(date.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  };
+
+  // Mở popup xem
   const handleView = (a) => {
-    if (typeof onView === "function") return onView(a);
-    alert(`Xem chi tiết bài: ${a.title}\nCủa: ${a.patientName}`);
+    setViewA(a);
   };
 
-  const handleFeedback = (a) => {
-    if (typeof onFeedback === "function") return onFeedback(a);
-    alert(`Gửi phản hồi cho: ${a.patientName}\nBài: ${a.title}`);
+  // Mở popup chỉnh sửa
+  const openEdit = (a) => {
+    setEditA(a);
+    setEditTitle(a.title || "");
+    setEditMethod(a.method || "");
+    setEditDifficulty(a.difficulty || "medium");
+    setEditFrequency(a.frequency || "daily");
+    setEditDueDate(toLocalInputValue(a.dueDate));
+    setEditEstimatedMinutes(a.estimatedMinutes || "");
+    setEditContent(a.content || "");
   };
 
-  const handleEdit = (a) => {
-    if (typeof onEdit === "function") return onEdit(a);
-    alert(`Chỉnh sửa bài: ${a.title}\nCủa: ${a.patientName}`);
+  // Lưu chỉnh sửa
+  const handleSaveEdit = async () => {
+    if (!editA) return;
+
+    const payload = {
+      title: editTitle.trim(),
+      method: editMethod.trim(),
+      difficulty: editDifficulty,
+      frequency: editFrequency,
+      content: editContent.trim(),
+      estimatedMinutes: editEstimatedMinutes
+        ? Number(editEstimatedMinutes)
+        : undefined,
+      dueDate: editDueDate ? new Date(editDueDate).toISOString() : null,
+    };
+
+    // validate đơn giản
+    if (!payload.title) {
+      alert("Tiêu đề không được để trống");
+      return;
+    }
+
+    try {
+      if (typeof onUpdate === "function") {
+        await onUpdate(editA._id, payload);
+      } else {
+        console.log("Update assignment payload >>>", editA._id, payload);
+      }
+      setEditA(null);
+    } catch (error) {
+      console.error(error);
+      alert("Cập nhật bài tập thất bại, vui lòng thử lại.");
+    }
   };
+
+  // Nếu chưa có bệnh nhân
+  if (!ap) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">Bài tập trị liệu</div>
+          <IconBtn icon={Plus} onClick={onAssignOpen}>
+            Giao bài mới
+          </IconBtn>
+        </div>
+        <Empty
+          icon={ClipboardList}
+          title="Chưa có bệnh nhân"
+          hint="Khi có bệnh nhân được gán, bạn sẽ thấy danh sách bài tập ở đây."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Tìm bài tập hoặc bệnh nhân"
-            className="h-10 w-72 rounded-xl border border-zinc-200 pl-9 pr-3 text-sm outline-none focus:border-zinc-400"
-          />
+      {/* Header: info bệnh nhân + search + Giao bài */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Search + Giao bài + tổng số */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Tìm bài tập theo tiêu đề"
+              className="h-10 w-64 max-w-full rounded-xl border border-zinc-200 pl-9 pr-3 text-sm outline-none focus:border-zinc-400"
+            />
+          </div>
+          <IconBtn icon={Plus} onClick={onAssignOpen}>
+            Giao bài mới
+          </IconBtn>
         </div>
-        <IconBtn icon={Plus} onClick={onAssignOpen}>
-          Giao bài mới
-        </IconBtn>
+        <div className="text-sm text-zinc-500">
+          Tổng: <span className="font-semibold">{filtered.length}</span> bài
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-1 lg:grid-cols-2">
-        {filtered.length === 0 && (
-          <Empty icon={ClipboardList} title="Không có bài tập" />
-        )}
+      {/* Empty state */}
+      {filtered.length === 0 && (
+        <div className="grid grid-cols-1">
+          <Empty
+            icon={ClipboardList}
+            title="Chưa có bài tập"
+            hint="Hãy giao bài tập đầu tiên cho bệnh nhân này."
+          />
+        </div>
+      )}
 
+      {/* Danh sách bài tập */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {filtered.map((a) => {
           const submitted = isSubmitted(a);
+
+          // màu cạnh trái theo status
+          const borderStripe =
+            a.status === "completed"
+              ? "border-l-4 border-l-emerald-500"
+              : a.status === "overdue"
+              ? "border-l-4 border-l-rose-500"
+              : a.status === "in_progress"
+              ? "border-l-4 border-l-sky-500"
+              : "border-l-4 border-l-amber-400";
+
+          const attachmentsCount = (a.attachments || []).length;
+
           return (
             <div
-              key={a.id}
-              className="flex items-center gap-3 rounded-2xl border bg-white p-3"
+              key={a._id}
+              className={`group relative flex flex-col gap-2 rounded-2xl border bg-white p-4 shadow-sm transition-all hover:shadow-md ${borderStripe}`}
             >
-              <Avatar name={a.patientName} />
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">{a.title}</div>
-                <div className="truncate text-xs text-zinc-500">
-                  {a.patientName} • Hạn: {fmtDateTime(a.dueDate || a.due)}
+              {/* Row 1: tiêu đề + status */}
+              <div className="flex items-start justify-around gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <div className="truncate text-sm font-semibold">
+                      {a.title}
+                    </div>
+                    <div className="flex gap-2">
+                      {a.aiSuggested && <Badge tone="info">AI gợi ý</Badge>}
+                      <Badge tone={statusTone(a.status)}>
+                        {statusLabel(a.status)}
+                      </Badge>
+                      {/* Actions */}
+                      {submitted ? (
+                        <IconBtn
+                          icon={Eye}
+                          onClick={() => handleView(a)}
+                          title="Xem chi tiết"
+                          className="border-zinc-200 hover:border-zinc-300"
+                        >
+                          Xem chi tiết
+                        </IconBtn>
+                      ) : (
+                        <IconBtn
+                          icon={PencilLine}
+                          onClick={() => openEdit(a)}
+                          title="Chỉnh sửa"
+                          className="border-zinc-200 hover:border-zinc-300 py-1.5! px-2.5!"
+                        >
+                          Chỉnh sửa
+                        </IconBtn>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Meta: method, khó, tần suất, thời lượng */}
+                  <div className="mt-2 flex flex-wrap items-center gap-1 text-[11px] text-zinc-500">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+                      Phương pháp:{" "}
+                      <span className="font-medium">
+                        {methodLabel(a.method)}
+                      </span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+                      Độ khó:{" "}
+                      <span className="font-medium">
+                        {convertDifficult(a.difficulty)}
+                      </span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+                      Tần suất:{" "}
+                      <span className="font-medium">
+                        {freqLabel(a.frequency)}
+                      </span>
+                    </span>
+                    {a.estimatedMinutes && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5">
+                        <Clock3 className="h-3 w-3" />~{a.estimatedMinutes} phút
+                      </span>
+                    )}
+                  </div>
+                  <hr className="text-gray-200 my-2"></hr>
+
+                  {/* Hạn + attachments */}
+                  <div className="mt-1 ml-2 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+                    <span>
+                      Hạn:{" "}
+                      <span className="font-medium">
+                        {a.dueDate ? fmtDateTime(a.dueDate) : "Không đặt hạn"}
+                      </span>
+                    </span>
+                    {attachmentsCount > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        <Paperclip className="h-3 w-3" />
+                        {attachmentsCount} tệp đính kèm
+                      </span>
+                    )}
+                  </div>
+
+                  <hr className="text-gray-200 my-2"></hr>
+                  {/* Nội dung rút gọn */}
+                  {a.content && (
+                    <div className="mt-2 text-xs text-zinc-600 line-clamp-2">
+                      {a.content}
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              <div className="ml-auto flex items-center gap-2">
-                <Badge tone={submitted ? "success" : "warn"}>
-                  {submitted ? "đã nộp" : "chưa nộp"}
-                </Badge>
-
-                {submitted ? (
-                  <>
-                    <IconBtn
-                      icon={Eye}
-                      onClick={() => handleView(a)}
-                      title="Xem chi tiết"
-                    >
-                      Xem
-                    </IconBtn>
-                    <IconBtn
-                      icon={MessageSquareText}
-                      onClick={() => handleFeedback(a)}
-                      title="Phản hồi"
-                    >
-                      Phản hồi
-                    </IconBtn>
-                  </>
-                ) : (
-                  <IconBtn
-                    icon={PencilLine}
-                    onClick={() => handleEdit(a)}
-                    title="Chỉnh sửa"
-                  >
-                    Chỉnh sửa
-                  </IconBtn>
-                )}
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* -------- POPUP XEM CHI TIẾT -------- */}
+      {viewA && (
+        <Modal
+          open={!!viewA}
+          title={`Chi tiết bài tập: ${viewA.title}`}
+          onClose={() => setViewA(null)}
+          footer={
+            <div className="flex justify-end">
+              <IconBtn onClick={() => setViewA(null)}>Đóng</IconBtn>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-sm">
+            <div>
+              <div className="text-zinc-500">Tiêu đề</div>
+              <div className="font-medium">{viewA.title}</div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 text-sm">
+              <div>
+                <div className="text-zinc-500">Phương pháp</div>
+                <div className="font-medium">{methodLabel(viewA.method)}</div>
+              </div>
+              <div>
+                <div className="text-zinc-500">Độ khó</div>
+                <div className="font-medium">
+                  {convertDifficult(viewA.difficulty)}
+                </div>
+              </div>
+              <div>
+                <div className="text-zinc-500">Tần suất</div>
+                <div className="font-medium">{freqLabel(viewA.frequency)}</div>
+              </div>
+              <div>
+                <div className="text-zinc-500">Thời lượng ước tính</div>
+                <div className="font-medium">
+                  {viewA.estimatedMinutes
+                    ? `${viewA.estimatedMinutes} phút`
+                    : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-zinc-500">Hạn</div>
+                <div className="font-medium">
+                  {viewA.dueDate ? fmtDateTime(viewA.dueDate) : "Không đặt hạn"}
+                </div>
+              </div>
+              <div>
+                <div className="text-zinc-500">Trạng thái</div>
+                <div className="font-medium">{statusLabel(viewA.status)}</div>
+              </div>
+            </div>
+
+            {viewA.content && (
+              <div>
+                <div className="text-zinc-500 mb-1">Hướng dẫn / Nội dung</div>
+                <div className="whitespace-pre-wrap rounded-xl border bg-zinc-50 p-3 text-sm">
+                  {viewA.content}
+                </div>
+              </div>
+            )}
+
+            {!!(viewA.attachments || []).length && (
+              <div>
+                <div className="text-zinc-500 mb-1 flex items-center gap-1">
+                  <Paperclip className="h-4 w-4" /> Tệp đính kèm
+                </div>
+                <ul className="list-disc pl-5 text-sm">
+                  {viewA.attachments.map((url, i) => (
+                    <li key={i}>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-indigo-600 hover:underline break-all"
+                      >
+                        File {i + 1}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* -------- POPUP CHỈNH SỬA -------- */}
+      {editA && (
+        <Modal
+          open={!!editA}
+          title={`Chỉnh sửa bài: ${editA.title}`}
+          onClose={() => setEditA(null)}
+          footer={
+            <div className="flex items-center justify-end gap-2">
+              <IconBtn onClick={() => setEditA(null)}>Hủy</IconBtn>
+              <IconBtn
+                className="border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-700"
+                onClick={handleSaveEdit}
+              >
+                Lưu thay đổi
+              </IconBtn>
+            </div>
+          }
+        >
+          <div className="space-y-3 text-sm">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Tiêu đề</label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Phương pháp
+                </label>
+                <input
+                  type="text"
+                  value={editMethod}
+                  onChange={(e) => setEditMethod(e.target.value)}
+                  placeholder="VD: CBT, ACT, Mindfulness..."
+                  className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">Độ khó</label>
+                <select
+                  value={editDifficulty}
+                  onChange={(e) => setEditDifficulty(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                >
+                  <option value="easy">Dễ</option>
+                  <option value="medium">Trung bình</option>
+                  <option value="hard">Khó</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Tần suất
+                </label>
+                <select
+                  value={editFrequency}
+                  onChange={(e) => setEditFrequency(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                >
+                  <option value="once">Một lần</option>
+                  <option value="daily">Hàng ngày</option>
+                  <option value="weekly">Hàng tuần</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Thời lượng ước tính (phút)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={editEstimatedMinutes}
+                  onChange={(e) => setEditEstimatedMinutes(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">Hạn</label>
+                <input
+                  type="datetime-local"
+                  value={editDueDate}
+                  onChange={(e) => setEditDueDate(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Hướng dẫn / Nội dung
+              </label>
+              <textarea
+                rows={4}
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="w-full rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-zinc-400"
+                placeholder="Mô tả cụ thể bài tập để bệnh nhân dễ làm theo…"
+              />
+            </div>
+
+            <p className="text-xs text-zinc-500">
+              *Nếu muốn chỉnh sửa file đính kèm, xử lý ở flow upload khác
+              (frontend hoặc màn riêng).
+            </p>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -2647,30 +3249,14 @@ function NotificationsView({ notifications, onMarkAll }) {
 
 // ----------------------------- Settings -------------------------------
 function SettingsView({ doctor, onSave, onCancel }) {
-  const DEFAULT = useMemo(
-    () => ({
-      avatarUrl: "",
-      fullName: "",
-      role: "counselor",
-      gender: "other",
-      yearsExperience: 0,
-      pricePerWeek: 0,
-      specializations: [],
-      modalities: [],
-      certificates: [],
-      bio: "",
-    }),
-    []
-  );
-
-  const init = { ...DEFAULT, ...(doctor || {}) };
+  const init = { ...(doctor || {}) };
 
   // ---------- State ----------
   const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(init.avatarUrl || "");
-  const [fullName, setFullName] = useState(init.fullName || "");
+  const [avatarPreview, setAvatarPreview] = useState(init.avatar || "");
+  const [fullName, setFullName] = useState(init.accountId.fullName || "");
   const [role, setRole] = useState(init.role || "counselor");
-  const [gender, setGender] = useState(init.gender || "other");
+  const [gender, setGender] = useState(init.accountId.gender || "other");
   const [yearsExperience, setYearsExperience] = useState(
     Number(init.yearsExperience || 0)
   );
@@ -2865,9 +3451,9 @@ function SettingsView({ doctor, onSave, onCancel }) {
                   onChange={(e) => setRole(e.target.value)}
                   className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-slate-400"
                 >
-                  <option value="counselor">Chuyên viên tham vấn</option>
-                  <option value="therapist">Nhà trị liệu tâm lý</option>
-                  <option value="psychiatrist">Bác sĩ tâm thần</option>
+                  <option value="counselor">Counselor</option>
+                  <option value="therapist">Therapist</option>
+                  <option value="psychiatrist">Psychiatrist</option>
                 </select>
                 {errors.role && (
                   <div className="mt-1 text-xs text-rose-600">
@@ -2886,8 +3472,8 @@ function SettingsView({ doctor, onSave, onCancel }) {
                   className="h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-slate-400"
                 >
                   <option value="other">Khác/Không nêu</option>
-                  <option value="male">Nam</option>
-                  <option value="female">Nữ</option>
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
                 </select>
               </div>
 
@@ -2948,7 +3534,28 @@ function SettingsView({ doctor, onSave, onCancel }) {
               <div className="text-xs text-slate-500">
                 Tài liệu đã có:{" "}
                 <span className="font-medium">
-                  {existingCerts.map((c) => c).join(", ")}
+                  {/* {existingCerts.map((c) => ( */}
+                  <ul className="space-y-1 text-sm">
+                    {existingCerts.map((f, i) => (
+                      <li
+                        key={i}
+                        className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-1.5"
+                      >
+                        <span className="truncate">{f}</span>
+                        <button
+                          onClick={() =>
+                            setCertFiles((prev) =>
+                              prev.filter((_, idx) => idx !== i)
+                            )
+                          }
+                          className="text-xs rounded-lg border border-slate-300 px-2 py-1 hover:bg-slate-50"
+                        >
+                          Xóa
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {/* ))} */}
                 </span>
               </div>
             )}
@@ -3085,7 +3692,7 @@ function SettingsView({ doctor, onSave, onCancel }) {
 // ---------------------------- Utilities -------------------------------
 function nameOf(listOrPatients, id) {
   const arr = Array.isArray(listOrPatients) ? listOrPatients : [];
-  return arr.find((p) => p.id === id)?.name || id;
+  return arr.find((p) => p._id === id)?.name || id;
 }
 
 function toLocalInputValue(iso) {

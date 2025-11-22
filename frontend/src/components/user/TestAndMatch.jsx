@@ -7,10 +7,12 @@ import PaymentModal from "../payments/PaymentModal";
 import { generateTransactionCode } from "../../utils/helper";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { useUserContext } from "../../context/userContext";
 
 const CODES = ["PHQ-9", "GAD-7"]; // Thứ tự: PHQ-9 trước, GAD-7 sau
 
 export default function TestAndMatch() {
+  const { fetchUser } = useUserContext();
   // Bước: 1 = Quizz (PHQ-9 + GAD-7), 2 = Match, 3 = Review
   const [step, setStep] = useState(1);
 
@@ -22,9 +24,12 @@ export default function TestAndMatch() {
 
   // Đề xuất bác sĩ
   const [matchLoading, setMatchLoading] = useState(false);
+  const [needDoctor, setNeedDoctor] = useState(false);
   const [matchError, setMatchError] = useState("");
   const [doctors, setDoctors] = useState([]);
   const [reason, setReason] = useState("");
+  const [spec, setSpec] = useState("");
+  const [levels, setLevels] = useState([]);
   const [pickedDoctorId, setPickedDoctorId] = useState(null);
   const [sortKey, setSortKey] = useState("best"); // best | rating | experience | priceAsc | priceDesc | name
 
@@ -56,6 +61,8 @@ export default function TestAndMatch() {
       try {
         setLoading(true);
         setError("");
+        setOrderCode("");
+        setOrderCode(generateTransactionCode());
         const results = {};
         for (const code of CODES) results[code] = await fetchTest(code);
         if (!mounted) return;
@@ -130,6 +137,9 @@ export default function TestAndMatch() {
         if (pickedDoctorId == null) setPickedDoctorId(null);
         setDoctors([]);
         setReason("");
+        setNeedDoctor(false);
+        setLevels([]);
+        setSpec("");
 
         const payload = {
           tests: CODES.map((code) => ({
@@ -149,6 +159,12 @@ export default function TestAndMatch() {
         const data = response?.data?.doctors || [];
         setReason(response?.data?.reason || "");
         setDoctors(Array.isArray(data) ? data : []);
+        setLevels({
+          "PHQ-9": response?.data?.phqLevel || "",
+          "GAD-7": response?.data?.gadLevel || "",
+        });
+        setNeedDoctor(response?.data?.needDoctor);
+        setSpec(response?.data?.spec || "");
       } catch (e) {
         if (mounted)
           setMatchError(e.message || "Đã có lỗi khi lấy đề xuất bác sĩ.");
@@ -489,25 +505,65 @@ export default function TestAndMatch() {
     window.scrollTo(0, 0);
   };
 
-  const submitFinal = async () => {
+  const handleConfirm = async () => {
     try {
-      const payload = {
-        tests: CODES.map((code) => ({ code, answers: answers[code] })),
-        doctorId: pickedDoctorId || null,
-      };
-      const res = await fetch("/api/screening/submit-choice", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || "Gửi xác nhận thất bại.");
-      alert("Đã gửi xác nhận lựa chọn bác sĩ thành công!");
-    } catch (e) {
-      alert(e.message || "Đã có lỗi xảy ra khi gửi xác nhận.");
+      const { data } = await axiosInstance.get(
+        API_PATHS.TRANSACTIONS.GET_TRANSACTION_BY_CODE(orderCode)
+      );
+      console.log(data);
+      if (data.success) {
+        toast.success("Thanh toan thanh cong");
+        const response = await axiosInstance.post(API_PATHS.ROOMS.CREATE_ROOM, {
+          doctorId: pickedDoctorId._id,
+        });
+        const roomId = response.data.room._id;
+        const transaction = await axiosInstance.patch(
+          API_PATHS.TRANSACTIONS.UPDATE_TRANSACTION(data.transaction._id),
+          {
+            roomId,
+          }
+        );
+        console.log(answers["PHQ-9"]);
+        const testResultPHQ9 = await axiosInstance.post(
+          API_PATHS.TEST_RESULTS.CREATE_TEST_RESULTS,
+          {
+            code: "PHQ-9",
+            answers: answers["PHQ-9"],
+            totalScore: computed["PHQ-9"]?.score,
+            band: levels["PHQ-9"],
+          }
+        );
+        const testResultGAD7 = await axiosInstance.post(
+          API_PATHS.TEST_RESULTS.CREATE_TEST_RESULTS,
+          {
+            code: "GAD-7",
+            answers: answers["GAD-7"],
+            totalScore: computed["GAD-7"]?.score,
+            band: levels["GAD-7"],
+          }
+        );
+        console.log(testResultPHQ9.data.testResult);
+        console.log(testResultPHQ9.data);
+        console.log(testResultPHQ9);
+        const updateUser = await axiosInstance.patch(
+          API_PATHS.USERS.UPDATE_USER,
+          {
+            testHistory: [
+              testResultPHQ9.data.testResult._id,
+              testResultGAD7.data.testResult._id,
+            ],
+            dominantSymptom: spec,
+            doctorIds: doctors,
+            currentDoctorId: pickedDoctorId._id,
+          }
+        );
+        fetchUser();
+        navigate("/user");
+      } else {
+        toast.error(data.message);
+      }
+    } catch (err) {
+      console.error(err.message);
     }
   };
 
@@ -588,53 +644,67 @@ export default function TestAndMatch() {
                   {reason ? (
                     <div className="text-gray-700 mb-4 mt-2">{reason}</div>
                   ) : null}
-                  {doctors.length === 0 ? (
-                    <div className="text-gray-700">
-                      Hiện chưa có đề xuất phù hợp. Bạn có thể tiếp tục sang
-                      bước tiếp theo.
-                    </div>
-                  ) : (
-                    <div className="grid sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {doctors
-                        .slice()
-                        .sort((a, b) => {
-                          switch (sortKey) {
-                            case "rating":
-                              return (b?.rating ?? 0) - (a?.rating ?? 0);
-                            case "experience":
-                              return (
-                                (b?.yearsExperience ?? 0) -
-                                (a?.yearsExperience ?? 0)
-                              );
-                            case "priceAsc":
-                              return (
-                                (a?.pricePerWeek ?? Infinity) -
-                                (b?.pricePerWeek ?? Infinity)
-                              );
-                            case "priceDesc":
-                              return (
-                                (b?.pricePerWeek ?? -Infinity) -
-                                (a?.pricePerWeek ?? -Infinity)
-                              );
-                            case "name": {
-                              const an =
-                                a?.accountId?.fullName || a?.fullName || "";
-                              const bn =
-                                b?.accountId?.fullName || b?.fullName || "";
-                              return an.localeCompare(bn, "vi");
+                  {needDoctor ? (
+                    doctors.length === 0 ? (
+                      <div className="text-gray-700">
+                        Hiện chưa có đề xuất phù hợp. Bạn có thể tiếp tục sang
+                        bước tiếp theo.
+                      </div>
+                    ) : (
+                      <div className="grid sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {doctors
+                          .slice()
+                          .sort((a, b) => {
+                            switch (sortKey) {
+                              case "rating":
+                                return (b?.rating ?? 0) - (a?.rating ?? 0);
+                              case "experience":
+                                return (
+                                  (b?.yearsExperience ?? 0) -
+                                  (a?.yearsExperience ?? 0)
+                                );
+                              case "priceAsc":
+                                return (
+                                  (a?.pricePerWeek ?? Infinity) -
+                                  (b?.pricePerWeek ?? Infinity)
+                                );
+                              case "priceDesc":
+                                return (
+                                  (b?.pricePerWeek ?? -Infinity) -
+                                  (a?.pricePerWeek ?? -Infinity)
+                                );
+                              case "name": {
+                                const an =
+                                  a?.accountId?.fullName || a?.fullName || "";
+                                const bn =
+                                  b?.accountId?.fullName || b?.fullName || "";
+                                return an.localeCompare(bn, "vi");
+                              }
+                              default:
+                                return 0; // giữ thứ tự backend
                             }
-                            default:
-                              return 0; // giữ thứ tự backend
-                          }
-                        })
-                        .map((d) => (
-                          <DoctorCard
-                            key={d._id}
-                            d={d}
-                            picked={pickedDoctorId?._id === d._id}
-                            onPick={() => setPickedDoctorId(d)}
-                          />
-                        ))}
+                          })
+                          .map((d) => (
+                            <DoctorCard
+                              key={d._id}
+                              d={d}
+                              picked={pickedDoctorId?._id === d._id}
+                              onPick={() => setPickedDoctorId(d)}
+                            />
+                          ))}
+                      </div>
+                    )
+                  ) : (
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => {
+                          localStorage.clear();
+                          navigate("/");
+                        }}
+                        className="px-5 py-2 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700"
+                      >
+                        Quay lại trang chủ
+                      </button>
                     </div>
                   )}
                 </>
@@ -649,12 +719,14 @@ export default function TestAndMatch() {
               >
                 ← Quay lại
               </button>
-              <button
-                onClick={goStep2Next}
-                className="px-5 py-2 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700"
-              >
-                Tiếp tục →
-              </button>
+              {needDoctor && (
+                <button
+                  onClick={goStep2Next}
+                  className="px-5 py-2 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700"
+                >
+                  Tiếp tục →
+                </button>
+              )}
             </div>
           </>
         )}
@@ -685,6 +757,10 @@ export default function TestAndMatch() {
                         <span className="font-semibold">
                           {computed[code]?.score ?? 0}
                         </span>
+                      </div>
+                      <div className="mt-1">
+                        Tình trạng:{" "}
+                        <span className="font-semibold">{levels[code]}</span>
                       </div>
                     </div>
                   );
@@ -780,7 +856,6 @@ export default function TestAndMatch() {
               <button
                 onClick={() => {
                   setOpen(true);
-                  setOrderCode(generateTransactionCode());
                 }}
                 className="px-5 py-2 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700"
               >
@@ -790,23 +865,7 @@ export default function TestAndMatch() {
             <PaymentModal
               open={open}
               onClose={() => setOpen(false)}
-              onConfirmed={async () => {
-                // setOpen(false);
-                try {
-                  const { data } = await axiosInstance.get(
-                    API_PATHS.TRANSACTIONS.GET_TRANSACTION_BY_CODE(orderCode)
-                  );
-                  if (data.success) {
-                    toast.success("Thanh toan thanh cong");
-                    navigate("/user");
-                  } else {
-                    toast.error(data.message);
-                  }
-                } catch (err) {
-                  console.error(err.message);
-                }
-                // TODO: gọi API xác nhận, refresh trạng thái đơn hàng, v.v.
-              }}
+              onConfirmed={handleConfirm}
               amount={10000}
               orderCode={orderCode}
             />

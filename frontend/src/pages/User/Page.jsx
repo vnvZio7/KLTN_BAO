@@ -4,31 +4,45 @@ import SchedulePage from "./features/schedule/SchedulePage";
 import ChatPage from "./features/chat/ChatPage";
 import NotificationsPage from "./features/notifications/NotificationsPage";
 import ProfilePage from "./features/profile/ProfilePage";
-import { DOCTORS, MOCK_BILLING } from "../../utils/data";
 import UserStatsPage from "./features/stats/UserStatsPage";
 import DoctorInfoPage from "./features/doctor/DoctorInfoPage";
 import DoctorHomeworkPage from "./Homework";
 import PaymentPage from "./features/PaymentPage";
-import {  useUserContext } from "../../context/userContext";
+import { useUserContext } from "../../context/userContext";
+import axiosInstance from "../../utils/axiosInstance";
+import { API_PATHS } from "../../utils/apiPaths";
 
 export default function Page() {
   const [active, setActive] = useState("stats");
-  const [currentDoctor, setCurrentDoctor] = useState(DOCTORS[0]);
+  const {
+    doctors,
+    user,
+    currentDoctor,
+    handleLogout,
+    assignments,
+    room,
+    sendMessage,
+    messages,
+  } = useUserContext();
   const [appointments, setAppointments] = useState([]);
-  const [billing, setBilling] = useState(MOCK_BILLING);
 
-  // const [user, setUser] = useState({
-  //   fullName: "Bao Nguyen",
-  //   email: "bao@example.com",
-  //   phone: "",
-  //   dob: "",
-  //   gender: "",
-  //   lang: "Việt",
-  //   bio: "",
-  //   avatar: "",
-  // });
-  const {user} = useUserContext();
-  console.log(user)
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        const room = await axiosInstance.get(API_PATHS.ROOMS.GET_ROOM);
+        console.log("Room");
+        const roomId = room.data.room._id;
+        const { data } = await axiosInstance.get(
+          API_PATHS.APPOINTMENTS.GET_APPOINTMENTS_BY_ROOMID(roomId)
+        );
+        setAppointments(data.appointments);
+      } catch (error) {
+        console.error(error.messages);
+      }
+    };
+
+    fetchAppointments();
+  }, []);
 
   const [notifications, setNotifications] = useState([
     {
@@ -81,10 +95,7 @@ export default function Page() {
     () => notifications.filter((n) => !n.read).length,
     [notifications]
   );
-  const handleLogout = () => {
-    // TODO: Thay bằng xoá token + chuyển hướng trang đăng nhập (React Router)
-    alert("Đã đăng xuất");
-  };
+
   return (
     <Shell
       active={active}
@@ -100,9 +111,7 @@ export default function Page() {
           messages={[]} // truyền dữ liệu thực nếu có
         />
       )}
-      {active === "billing" && (
-        <PaymentPage billing={billing} setBilling={setBilling} />
-      )}
+      {active === "billing" && <PaymentPage />}
       {active === "schedule" && (
         <SchedulePage
           doctor={currentDoctor}
@@ -114,19 +123,26 @@ export default function Page() {
       {active === "doctor" && (
         <DoctorInfoPage
           doctor={currentDoctor}
-          suggestions={DOCTORS} // <— truyền mảng gợi ý
+          suggestions={doctors} // <— truyền mảng gợi ý
           onSwitch={(picked) => {
-            setCurrentDoctor(picked); // picked đã đúng shape card
             // (tuỳ chọn) gọi API yêu cầu đổi bác sĩ ở đây
             setActive("doctor");
           }}
         />
       )}
 
-      {active === "homework" && <DoctorHomeworkPage />}
+      {active === "homework" && (
+        <DoctorHomeworkPage assignments={assignments} />
+      )}
 
       {active === "chat" && (
-        <ChatPage doctor={currentDoctor} setUnreadChat={setUnreadChat} />
+        <ChatPage
+          room={room}
+          onSend={sendMessage}
+          doctor={currentDoctor}
+          messages={messages}
+          setUnreadChat={setUnreadChat}
+        />
       )}
       {active === "notifications" && (
         <NotificationsPage
@@ -134,7 +150,7 @@ export default function Page() {
           setNotifications={setNotifications}
         />
       )}
-      {active === "profile" && <ProfilePage user={user}/>}
+      {active === "profile" && <ProfilePage user={user} />}
     </Shell>
   );
 }

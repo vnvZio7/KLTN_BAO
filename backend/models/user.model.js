@@ -7,12 +7,16 @@ const userSchema = new mongoose.Schema(
       ref: "Account",
       index: true,
     },
-    lastPHQ9Score: Number,
-    lastGAD7Score: Number,
     walletBalance: { type: Number, default: 0 }, // so du
     testHistory: [
-      { testId: mongoose.Schema.Types.ObjectId, result: Number, date: Date },
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "TestResult",
+      },
     ],
+    dominantSymptom: String, // Lo âu, Trầm cảm
+    aiNotes: String, // Ghi chú AI (giải thích ngắn)
+    doctorIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Doctor" }],
     currentDoctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
   },
   { timestamps: true }

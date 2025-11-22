@@ -20,7 +20,6 @@ export default function Shell({
     { key: "profile", label: "Thông tin cá nhân" },
     { key: "billing", label: "Thanh toán" },
   ];
-  console.log(user);
   const initials = (name = "U") =>
     name
       .split(" ")
@@ -40,9 +39,7 @@ export default function Shell({
               <h1 className="text-lg font-semibold leading-tight">
                 Sức Khỏe Tâm Lý
               </h1>
-              <p className="text-xs text-slate-500">
-                Cổng người dùng (sau bài test)
-              </p>
+              <p className="text-xs text-slate-500">Cổng người dùng</p>
             </div>
           </div>
           {/* Thông tin người dùng + menu hover Đăng xuất */}
@@ -64,7 +61,7 @@ export default function Shell({
 
             {/* Dropdown khi hover */}
             <div
-              className="absolute right-0 mt-2 w-40 bg-white border border-slate-200
+              className="absolute right-0 mt-0 w-40 bg-white border border-slate-200
                   rounded-xl shadow-lg opacity-0 pointer-events-none
                   group-hover:opacity-100 group-hover:pointer-events-auto transition"
             >

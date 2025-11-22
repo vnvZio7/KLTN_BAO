@@ -13,7 +13,15 @@ const roomSchema = new mongoose.Schema(
       ref: "Doctor",
       required: true,
     },
-    lastMessageAt: Date,
+    startDate: { type: Date, default: Date.now },
+    endDate: Date, // chỉ có khi kết thúc trị liệu
+    status: {
+      type: String,
+      enum: ["active", "completed", "paused"],
+      default: "active",
+    },
+    lastMessageAt: { type: Date },
+    lastMessage: String,
   },
   { timestamps: true }
 );

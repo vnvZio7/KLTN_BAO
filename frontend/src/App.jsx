@@ -357,6 +357,7 @@ import ProtectedRoute, {
   RequireNoTest,
   RequireTestDone,
 } from "./components/ProtectedRoute";
+import DoctorPortal from "./pages/Doctor/DoctorPortal";
 
 export default function App() {
   return (
@@ -364,12 +365,13 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/test" element={<TestAndMatch />} />{" "}
+      {/* <Route path="/test" element={<TestAndMatch />} />{" "}
       <Route path="/user" element={<Page />} />
       <Route path="/doctor" element={<DoctorPage />} />{" "}
       <Route path="/pending" element={<PendingApproval />} />
       <Route path="/payment" element={<DoctorListWithPayment />} />*{" "}
-      <Route path="/admin-test" element={<AdminPortal />} />
+      <Route path="/admin-test" element={<AdminPortal />} /> */}
+
       {/* <Route path="/admin" element={<AdminLayout />}>
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="users" element={<Users />} />
@@ -377,8 +379,9 @@ export default function App() {
         <Route path="appointments" element={<Appointments />} />
         <Route path="screenings" element={<Screenings />} />
       </Route> */}
+
       {/* USER */}
-      {/* <Route element={<ProtectedRoute allow={["user"]} />}>
+      <Route element={<ProtectedRoute allow={["user"]} />}>
         <Route element={<RequireNoTest />}>
           <Route path="/test" element={<TestAndMatch />} />{" "}
         </Route>
@@ -386,21 +389,20 @@ export default function App() {
           <Route path="/user" element={<Page />} />
           <Route path="/payment" element={<DoctorListWithPayment />} />
         </Route>
-      </Route> */}
+      </Route>
       {/* DOCTOR ROUTES */}
-      {/* <Route element={<ProtectedRoute allow={["doctor"]} />}>
+      <Route element={<ProtectedRoute allow={["doctor"]} />}>
         <Route element={<RequireDoctorApproved />}>
           <Route path="/doctor" element={<DoctorPage />} />{" "}
         </Route>
         <Route element={<RequireDoctorPending />}>
           <Route path="/pending" element={<PendingApproval />} />
         </Route>
-      </Route> */}
+      </Route>
       {/* ADMIN ROUTES */}
-      {/* <Route element={<ProtectedRoute allow={["admin"]} />}>
-        
+      <Route element={<ProtectedRoute allow={["admin"]} />}>
         <Route path="/admin-test" element={<AdminPortal />} />
-      </Route> */}
+      </Route>
       {/* <Route path="/admin" element={<AdminLayout />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="users" element={<Users />} />

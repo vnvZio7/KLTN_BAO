@@ -4,7 +4,7 @@ import Room from "../models/room.model.js";
 // @access  Private (Admin)
 const getRooms = async (req, res) => {
   try {
-    const rooms = await Room.find().populate("accountId").select("-password");
+    const rooms = await Room.find();
     res.json(rooms);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -14,24 +14,37 @@ const getRooms = async (req, res) => {
 // @desc    Get room by ID
 // @route   GET /api/rooms/:id
 // @access  Private
-const getRoomByUserId = async (req, res) => {
+const getRoom = async (req, res) => {
   try {
-    const room = await Room.findOne(req.params.id)
-      .populate("accountId")
-      .select("-password");
+    const myId = req.user._id; // id của người đang login
+
+    const room = await Room.find({
+      status: "active",
+      $or: [{ doctorId: myId }, { userId: myId }],
+    }).lean();
+    console.log("room: ", room);
     if (!room) return res.status(404).json({ message: "Room not found" });
-    res.json(room);
+    res.json({ room });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-const createRoom = async (req, res) =>{
+const createRoom = async (req, res) => {
   try {
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-    
-  }
-}
+    const room = await Room.create({
+      userId: req.user._id,
+      doctorId: req.body.doctorId,
+    });
 
-export { getRooms, getRoomByUserId,createRoom };
+    res.status(201).json({ message: "Đã tạo room thành công!", room });
+  } catch (err) {
+    console.error("create error:", err);
+    return res.status(500).json({
+      message: "Lỗi server khi cập tạo room",
+      error: err.message,
+    });
+  }
+};
+
+export { getRooms, getRoom, createRoom };

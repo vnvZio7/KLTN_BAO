@@ -1,72 +1,258 @@
-import React, { createContext, useEffect, useState, useContext } from "react";
+// context/UserContext.jsx
+import React, {
+  createContext,
+  useEffect,
+  useState,
+  useContext,
+  useCallback,
+  useMemo,
+} from "react";
 import axiosInstance from "../utils/axiosInstance";
 import { API_PATHS } from "../utils/apiPaths";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 export const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
+  const navigate = useNavigate();
+
   const [user, setUser] = useState(null);
+  const [currentDoctor, setCurrentDoctor] = useState(null);
+  const [doctors, setDoctors] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [messages, setMessages] = useState([]);
+
+  const [room, setRoom] = useState(null);
+  const [rooms, setRooms] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [exercises, setExercises] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [token, setToken] = useState(() => localStorage.getItem("accessToken"));
 
-  const navigate = useNavigate();
-  useEffect(() => {
-    if (user) return;
+  // ---------- Helpers ----------
+  const clearUser = useCallback(() => {
+    setUser(null);
+    setDoctors([]);
+    setCurrentDoctor(null);
+    setPatients([]);
+    setAssignments([]);
+    setRoom(null);
+    setRooms([]);
+    setMessages([]);
+    localStorage.removeItem("accessToken");
+  }, []);
 
-    const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) {
+  const getToken = useCallback(() => {
+    return localStorage.getItem("accessToken");
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    setIsLoggingOut(true);
+    localStorage.clear();
+    clearUser();
+    navigate("/login");
+    scrollTo(0, 0);
+  }, [clearUser, navigate]);
+
+  // ---------- API calls ----------
+  const fetchExercises = useCallback(async () => {
+    try {
+      const { data } = await axiosInstance.get(
+        API_PATHS.EXERCISES.GET_ALL_EXERCISES
+      );
+      setExercises(data.exerciseTemplates || []);
+      // console.log("exerciseTemplates >>>", data.exerciseTemplates);
+    } catch (error) {
+      console.error("fetchExercises error:", error?.message || error);
+    }
+  }, []);
+
+  const fetchAssignment = useCallback(async (userId) => {
+    try {
+      const { data } = await axiosInstance.get(
+        API_PATHS.HOMEWORK_ASSIGNMENTS.GET_HOMEWORK_ASSIGNMENT_BY_ID(userId)
+      );
+      return data.homeworkAssignment || [];
+    } catch (error) {
+      console.error("fetchAssignment error:", error?.message || error);
+      return [];
+    }
+  }, []);
+
+  const fetchRoom = useCallback(async () => {
+    try {
+      const { data } = await axiosInstance.get(API_PATHS.ROOMS.GET_ROOM);
+      return data.room || null;
+    } catch (error) {
+      console.error("fetchRoom error:", error?.message || error);
+    }
+  }, []);
+
+  const fetchMessages = useCallback(async (roomId) => {
+    try {
+      const { data } = await axiosInstance.get(
+        API_PATHS.MESSAGES.GET_MESSAGES_BY_ROOM_ID(roomId)
+      );
+      console.log(data.messages);
+      setMessages(data.messages);
+    } catch (error) {
+      console.error("fetch Message error:", error?.message || error);
+    }
+  }, []);
+
+  const sendMessage = useCallback(async ({ roomId, content }) => {
+    try {
+      const { data } = await axiosInstance.post(
+        API_PATHS.MESSAGES.SEND_MESSAGE,
+        {
+          roomId,
+          content,
+        }
+      );
+      console.log(data.message);
+      if (data.sucess) {
+        await fetchMessages(roomId);
+      }
+    } catch (error) {
+      console.error("send Message error:", error?.message || error);
+    }
+  }, []);
+
+  const fetchUser = useCallback(async () => {
+    if (!token) {
+      clearUser();
       setLoading(false);
       return;
     }
 
-    const fetchUser = async () => {
-      try {
-        const response = await axiosInstance.get(API_PATHS.AUTH.GET_PROFILE);
-        setUser(response.data.user);
-        console.log(user)
-      } catch (error) {
-        console.error("User not authenticated", error);
-        clearUser();
-      } finally {
-        setLoading(false);
+    // Đọc account trong localStorage an toàn
+    let localAccount = null;
+    try {
+      const raw = localStorage.getItem("account");
+      localAccount = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      console.warn("Cannot parse localStorage.account:", e);
+    }
+
+    // Nếu là admin: không cần gọi GET_PROFILE (tuỳ app),
+    // nhưng vẫn phải tắt loading để UI hiển thị được.
+    if (localAccount?.role === "admin") {
+      setUser(null);
+      setDoctors([]);
+      setCurrentDoctor(null);
+      setPatients([]);
+      setAssignments([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await axiosInstance.get(API_PATHS.AUTH.GET_PROFILE);
+      const dataUser = response.data.user;
+      setUser(dataUser);
+      // console.log("profile >>>", dataUser);
+
+      const accountRole = dataUser?.accountId?.role;
+
+      // ----- USER -----
+      if (accountRole === "user") {
+        setDoctors(dataUser.doctorIds || []);
+        setCurrentDoctor(dataUser.currentDoctorId || null);
+        const r = await fetchRoom();
+        console.log(r[0]);
+        setRoom(r[0]);
+        const hw = await fetchAssignment(dataUser._id);
+        setAssignments(hw);
+        await fetchMessages(r[0]._id);
       }
-    };
+
+      // ----- DOCTOR -----
+      if (accountRole === "doctor") {
+        const { data } = await axiosInstance.get(
+          API_PATHS.USERS.GET_USERS_BY_DOCTORID
+        );
+        const resPatients = data?.users || [];
+        setPatients(resPatients);
+
+        if (resPatients.length > 0) {
+          const allAssignments = await Promise.all(
+            resPatients.map((u) => fetchAssignment(u._id))
+          );
+          setAssignments(allAssignments.flat());
+          const allRooms = await fetchRoom();
+          setRooms(allRooms);
+        } else {
+          setAssignments([]);
+        }
+      }
+    } catch (error) {
+      console.error("User not authenticated:", error);
+      clearUser();
+    } finally {
+      setLoading(false);
+    }
+  }, [token, clearUser, fetchAssignment]);
+
+  // ---------- Effect khởi tạo ----------
+  useEffect(() => {
+    if (!token) {
+      clearUser();
+      setLoading(false);
+      return;
+    }
+    fetchExercises();
     fetchUser();
-  }, []);
+  }, [token, fetchExercises, fetchUser, clearUser]);
 
-  const clearUser = () => {
-    setUser(null);
-    localStorage.removeItem("accessToken");
-  };
-
-  const handleLogout = () => {
-    setIsLoggingOut(true);
-
-    localStorage.clear();
-    clearUser();
-
-    navigate("/");
-    scrollTo(0, 0);
-  };
-
-  const getToken = () => {
-    if (user) return localStorage.getItem("accessToken");
-  };
-  return (
-    <UserContext.Provider
-      value={{
-        user,
-        loading,
-        clearUser,
-        handleLogout,
-        getToken,
-        isLoggingOut,
-      }}
-    >
-      {children}
-    </UserContext.Provider>
+  // ---------- Memo hoá value context ----------
+  const value = useMemo(
+    () => ({
+      user,
+      fetchUser,
+      setToken,
+      doctors,
+      currentDoctor,
+      loading,
+      clearUser,
+      handleLogout,
+      getToken,
+      isLoggingOut,
+      patients,
+      rooms,
+      room,
+      exercises,
+      assignments,
+      sendMessage,
+      messages,
+      fetchMessages,
+    }),
+    [
+      user,
+      messages,
+      fetchUser,
+      setToken,
+      doctors,
+      currentDoctor,
+      loading,
+      clearUser,
+      handleLogout,
+      getToken,
+      isLoggingOut,
+      patients,
+      rooms,
+      room,
+      exercises,
+      assignments,
+      sendMessage,
+      fetchMessages,
+    ]
   );
+
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 };
 
 export const useUserContext = () => useContext(UserContext);

@@ -1,6 +1,9 @@
 import { AlignLeft, MoveLeftIcon } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useUserContext } from "../../context/userContext";
 
 export default function PendingApproval() {
+  const { handleLogout } = useUserContext();
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
@@ -51,13 +54,14 @@ export default function PendingApproval() {
 
             {/* Actions */}
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <a
-                href="/"
+              <Link
+                onClick={handleLogout}
+                to="/"
                 className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
               >
                 <MoveLeftIcon className="w-4 h-4 mr-1 items-center" /> Quay lại
                 trang chủ
-              </a>
+              </Link>
 
               {/* <button
                 type="button"

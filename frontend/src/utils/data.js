@@ -733,3 +733,21 @@ export const MOCK_BILLING = {
   ],
   coupons: [],
 };
+
+export const THERAPY_METHODS = [
+  "CBT",
+  "Behavioral Activation",
+  "ACT",
+  "MBCT",
+  "Mindfulness",
+  "Exposure",
+  "Interpersonal (IPT)",
+  "DBT",
+  "Schema",
+  "Psychodynamic",
+  "Emotion-Focused (EFT)",
+  "Solution-Focused (SFBT)",
+  "Family",
+  "Biofeedback / Neurofeedback",
+  "Relaxation",
+];

@@ -1,60 +1,58 @@
 // src/pages/QuickPayment.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PaymentModal from "../../../components/payments/PaymentModal"; // chỉnh lại path nếu khác
-
-// ---- Mock fallback nếu không truyền props.billing ----
-const MOCK = {
-  plan: {
-    name: "Weekly Care",
-    currency: "VND",
-    price: 249000, // số tiền phải thanh toán tuần này
-    nextChargeAt: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString(),
-  },
-  invoices: [
-    {
-      id: "inv_8h3kx",
-      date: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString(),
-      amount: 249000,
-      status: "paid",
-    },
-    {
-      id: "inv_7af20",
-      date: new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString(),
-      amount: 249000,
-      status: "paid",
-    },
-  ],
-};
+import axiosInstance from "../../../utils/axiosInstance";
+import { API_PATHS } from "../../../utils/apiPaths";
+import {
+  generateTransactionCode,
+  getNextMondayAndSaturday,
+} from "../../../utils/helper";
+import { useUserContext } from "../../../context/userContext";
 
 const currency = (v, c = "VND") =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: c }).format(v);
 
-export default function PaymentPage({ billing }) {
-  const [state, setState] = useState(billing || MOCK);
-  const { plan } = state;
-
+export default function PaymentPage() {
+  const { currentDoctor } = useUserContext();
+  const plan = {
+    currency: "VND",
+    price: currentDoctor.pricePerWeek, // số tiền phải thanh toán tuần này
+  };
+  const [invoices, setInvoices] = useState([]);
+  useEffect(() => {
+    const getInvoices = async () => {
+      try {
+        const response = await axiosInstance.get(
+          API_PATHS.TRANSACTIONS.GET_ALL_TRANSACTIONS
+        );
+        setInvoices(response.data.transactions);
+        console.log(response.data);
+      } catch (error) {
+        console.error(error.message);
+      }
+    };
+    getInvoices();
+  }, []);
   const [showPay, setShowPay] = useState(false);
 
   // Mã nội dung chuyển khoản (orderCode) để khớp thanh toán
-  const orderCode = useMemo(
-    () =>
-      `POMERA-${Date.now().toString(36)}-${Math.random()
-        .toString(36)
-        .slice(2, 6)}`,
-    []
-  );
+  const orderCode = useMemo(() => generateTransactionCode(), []);
 
-  const nextChargeLabel = useMemo(
-    () =>
-      new Date(plan.nextChargeAt).toLocaleString("vi-VN", {
-        weekday: "short",
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    [plan.nextChargeAt]
-  );
+  const { nextMonday, nextSaturday } = getNextMondayAndSaturday();
+  const nextWeekLabel = useMemo(() => {
+    const formatOptions = {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    };
+
+    const mondayLabel = nextMonday.toLocaleString("vi-VN", formatOptions);
+    const saturdayLabel = nextSaturday.toLocaleString("vi-VN", formatOptions);
+
+    return `${mondayLabel} → ${saturdayLabel}`;
+  }, []);
 
   const onConfirmPaid = () => {
     // Khi user bấm "Đã chuyển khoản" trong PaymentModal → thêm hoá đơn mới
@@ -76,7 +74,15 @@ export default function PaymentPage({ billing }) {
         <header className="bg-white rounded-2xl border border-slate-200 p-5">
           <h1 className="text-xl font-semibold">Thanh toán</h1>
           <p className="text-slate-600 text-sm">
-            Vui lòng thanh toán để có thể tiếp tục làm việc với bác sĩ.
+            {`Vui lòng thanh toán trước ngày ${nextMonday.toLocaleString(
+              "vi-VN",
+              {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              }
+            )} để có thể tiếp tục làm
+            việc với bác sĩ.`}
           </p>
         </header>
 
@@ -85,7 +91,7 @@ export default function PaymentPage({ billing }) {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="text-sm text-slate-600">Gói</div>
-              <div className="text-lg font-semibold">{plan.name}</div>
+              <div className="text-lg font-semibold">Thanh toán theo tuần</div>
             </div>
             <div className="text-right">
               <div className="text-sm text-slate-600">
@@ -95,7 +101,7 @@ export default function PaymentPage({ billing }) {
                 {currency(plan.price, plan.currency)}
               </div>
               <div className="text-xs text-slate-500 mt-1">
-                Kỳ tiếp theo: <b>{nextChargeLabel}</b>
+                Kỳ tiếp theo: <b>{nextWeekLabel}</b>
               </div>
             </div>
           </div>
@@ -125,24 +131,28 @@ export default function PaymentPage({ billing }) {
                 <tr className="text-left text-slate-600">
                   <th className="py-2 pr-4">Mã hoá đơn</th>
                   <th className="py-2 pr-4">Ngày</th>
+                  <th className="py-2 pr-4">Bác sĩ </th>
                   <th className="py-2 pr-4">Số tiền</th>
                   <th className="py-2 pr-4">Trạng thái</th>
                   <th className="py-2 pr-4"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {(state.invoices || []).length === 0 && (
+                {(invoices || []).length === 0 && (
                   <tr>
                     <td className="py-6 text-slate-500" colSpan={5}>
                       Chưa có hoá đơn nào.
                     </td>
                   </tr>
                 )}
-                {(state.invoices || []).map((iv) => (
-                  <tr key={iv.id}>
-                    <td className="py-2 pr-4 font-medium">{iv.id}</td>
+                {(invoices || []).map((iv) => (
+                  <tr key={iv._id}>
+                    <td className="py-2 pr-4 font-medium">{iv._id}</td>
                     <td className="py-2 pr-4">
-                      {new Date(iv.date).toLocaleString("vi-VN")}
+                      {new Date(iv.paidAt).toLocaleString("vi-VN")}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {iv.doctorId.accountId.fullName}
                     </td>
                     <td className="py-2 pr-4">
                       {currency(iv.amount, plan.currency)}

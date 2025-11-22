@@ -4,38 +4,36 @@ import { prettyTime } from "../../../../utils/helper";
 import { INITIAL_MESSAGES } from "../../../../utils/data";
 
 export default function ChatPage({
+  room,
   doctor,
   setUnreadChat,
+  messages,
+  onSend,
   onComplete, // optional: callback khi đánh dấu hoàn thành
   onSendComplete, // optional: callback gửi yêu cầu hoàn thành tới bác sĩ/backend
 }) {
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [text, setText] = useState("");
   const [completed, setCompleted] = useState(false);
   const listRef = useRef(null);
 
-  const send = () => {
+  console.log(messages);
+  const send = async () => {
     if (!text.trim()) return;
-    const me = {
-      id: Math.random().toString(36).slice(2),
-      from: "user",
-      text,
-      time: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, me]);
-    setText("");
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(36).slice(2),
-          from: "doctor",
-          text: "Mình đã nhận tin. Bạn thử thở 4-7-8 5 phút nhé!",
-          time: new Date().toISOString(),
-        },
-      ]);
-      setUnreadChat?.((c) => (typeof c === "number" ? c + 1 : c));
-    }, 900);
+    await onSend({ roomId: room._id, content: text });
+    // setMessages((prev) => [...prev, me]);
+    // setText("");
+    // setTimeout(() => {
+    //   setMessages((prev) => [
+    //     ...prev,
+    //     {
+    //       id: Math.random().toString(36).slice(2),
+    //       from: "doctor",
+    //       text: "Mình đã nhận tin. Bạn thử thở 4-7-8 5 phút nhé!",
+    //       time: new Date().toISOString(),
+    //     },
+    //   ]);
+    //   setUnreadChat?.((c) => (typeof c === "number" ? c + 1 : c));
+    // }, 900);
   };
 
   const handleComplete = async () => {
@@ -54,7 +52,7 @@ export default function ChatPage({
       text: "Bạn đã đánh dấu HOÀN THÀNH khóa điều trị. Yêu cầu đã được gửi tới bác sĩ.",
       time: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, sysMsg]);
+    // setMessages((prev) => [...prev, sysMsg]);
 
     // 3) Gửi callback lên parent/backend nếu cần
     try {
@@ -100,11 +98,11 @@ export default function ChatPage({
       <div className="p-4 border-b border-slate-200 flex items-center gap-3">
         <img
           src={doctor.avatar}
-          alt={doctor.name}
+          alt={doctor.accountId.fullName}
           className="h-9 w-9 rounded-full object-cover"
         />
         <div>
-          <div className="font-medium">{doctor.name}</div>
+          <div className="font-medium">{doctor.accountId.fullName}</div>
           <div className="text-xs text-emerald-700">● Trực tuyến</div>
         </div>
       </div>
@@ -115,37 +113,37 @@ export default function ChatPage({
         className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"
       >
         {messages.map((m) => {
-          if (m.from === "system") {
+          if (m.senderType === "system") {
             return (
               <div
-                key={m.id}
+                key={m._id}
                 className="mx-auto max-w-[80%] text-center text-xs text-slate-600"
               >
                 <div className="inline-block rounded-lg border border-slate-200 bg-white px-3 py-1.5">
-                  {m.text}
+                  {m.content}
                 </div>
                 <div className="mt-1 text-[11px] text-slate-400">
-                  {prettyTime(m.time)}
+                  {prettyTime(m.createdAt)}
                 </div>
               </div>
             );
           }
           return (
             <div
-              key={m.id}
-              className={`max-w-[70%] rounded-2xl px-4 py-2 shadow-sm ${
-                m.from === "user"
+              key={m._id}
+              className={`max-w-[65%] rounded-2xl px-4 py-2 shadow-sm ${
+                m.senderType === "user"
                   ? "ml-auto bg-indigo-600 text-white"
                   : "mr-auto bg-white border border-slate-200"
               }`}
             >
-              <div className="text-sm leading-relaxed">{m.text}</div>
+              <div className="text-sm leading-relaxed">{m.content}</div>
               <div
                 className={`mt-1 text-[11px] ${
-                  m.from === "user" ? "text-indigo-100" : "text-slate-500"
+                  m.senderType === "user" ? "text-indigo-100" : "text-slate-500"
                 }`}
               >
-                {prettyTime(m.time)}
+                {prettyTime(m.createdAt)}
               </div>
             </div>
           );

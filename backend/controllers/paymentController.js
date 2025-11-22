@@ -17,9 +17,6 @@ const getDataSePay = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-function isObjectId(str) {
-  return /^[0-9a-fA-F]{24}$/.test(str);
-}
 
 const webhooks = async (req, res) => {
   try {
@@ -30,6 +27,7 @@ const webhooks = async (req, res) => {
       status: "paid",
       paid: data.transactionDate,
     });
+
     return res.status(200).json({ success: true, message: "OK" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });

@@ -30,6 +30,10 @@ export const dateFormat = (date) => {
   });
 };
 
+export const formatAge = (date) => {
+  return new Date().getFullYear() - new Date(date).getFullYear();
+};
+
 export const kConverter = (num) => {
   if (num >= 1000) {
     return (num / 1000).toFixed(1) + "k";
@@ -60,4 +64,41 @@ export function generateTransactionCode() {
   const timestamp = Date.now(); // số nguyên theo mili giây
   const random = Math.floor(Math.random() * 1000); // thêm 3 chữ số ngẫu nhiên
   return `BAO${timestamp}${random}`; // ví dụ: DH169987654321045
+}
+
+export function getNextMondayAndSaturday() {
+  const today = new Date();
+  const day = today.getDay(); // 0 CN, 1 T2, ... 6 T7
+
+  // Tính thứ 2 tuần sau
+  const daysToNextMonday = (8 - day) % 7 || 7;
+  const nextMonday = new Date(today);
+  nextMonday.setDate(today.getDate() + daysToNextMonday);
+  nextMonday.setHours(0, 0, 0, 0);
+
+  // Thứ 7 = thứ 2 + 5 ngày
+  const nextSaturday = new Date(nextMonday);
+  nextSaturday.setDate(nextMonday.getDate() + 5);
+  nextSaturday.setHours(23, 59, 0, 0);
+
+  return { nextMonday, nextSaturday };
+}
+
+export function convertDifficult(difficulty) {
+  return difficulty === "easy"
+    ? "Dễ"
+    : difficulty === "medium"
+    ? "Trung bình"
+    : difficulty === "hard"
+    ? "Khó"
+    : "Dễ";
+}
+export function reconvertDifficult(difficulty) {
+  return difficulty === "Dễ"
+    ? "easy"
+    : difficulty === "Trung bình"
+    ? "medium"
+    : difficulty === "Khó"
+    ? "hard"
+    : "easy";
 }
