@@ -27,6 +27,8 @@ export const UserProvider = ({ children }) => {
   const [rooms, setRooms] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [exercises, setExercises] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -139,15 +141,15 @@ export const UserProvider = ({ children }) => {
 
     // Nếu là admin: không cần gọi GET_PROFILE (tuỳ app),
     // nhưng vẫn phải tắt loading để UI hiển thị được.
-    if (localAccount?.role === "admin") {
-      setUser(null);
-      setDoctors([]);
-      setCurrentDoctor(null);
-      setPatients([]);
-      setAssignments([]);
-      setLoading(false);
-      return;
-    }
+    // if (localAccount?.role === "admin") {
+    //   setUser(null);
+    //   setDoctors([]);
+    //   setCurrentDoctor(null);
+    //   setPatients([]);
+    //   setAssignments([]);
+    //   setLoading(false);
+    //   return;
+    // }
 
     setLoading(true);
     try {
@@ -156,7 +158,7 @@ export const UserProvider = ({ children }) => {
       setUser(dataUser);
       // console.log("profile >>>", dataUser);
 
-      const accountRole = dataUser?.accountId?.role;
+      const accountRole = dataUser?.accountId?.role || dataUser?.role;
 
       // ----- USER -----
       if (accountRole === "user") {
@@ -189,10 +191,32 @@ export const UserProvider = ({ children }) => {
           setAssignments([]);
         }
       }
+      console.log(accountRole);
+      if (accountRole === "admin") {
+        const res = await axiosInstance.get(API_PATHS.ADMIN.GET_ALL_ACCOUNTS);
+        const resAccounts = res.data?.accounts || [];
+        setAccounts(resAccounts);
+        console.log("data resAccounts: ", resAccounts);
+
+        const responseTransaction = await axiosInstance.get(
+          API_PATHS.ADMIN.GET_ALL_TRANSACTIONS
+        );
+        const resTransactions = responseTransaction.data?.transactions || [];
+        setTransactions(resTransactions);
+        console.log("data resTransactions: ", resTransactions);
+
+        const { data } = await axiosInstance.get(
+          API_PATHS.DOCTORS.GET_ALL_DOCTORS
+        );
+        const resDoctors = data?.doctors || [];
+        setDoctors(resDoctors);
+        console.log("data Doctor: ", resDoctors);
+      }
     } catch (error) {
       console.error("User not authenticated:", error);
       clearUser();
     } finally {
+      console.log(">>> CALL setLoading(false)");
       setLoading(false);
     }
   }, [token, clearUser, fetchAssignment]);
@@ -229,6 +253,9 @@ export const UserProvider = ({ children }) => {
       sendMessage,
       messages,
       fetchMessages,
+      setLoading,
+      accounts,
+      transactions,
     }),
     [
       user,
@@ -249,6 +276,9 @@ export const UserProvider = ({ children }) => {
       assignments,
       sendMessage,
       fetchMessages,
+      setLoading,
+      accounts,
+      transactions,
     ]
   );
 

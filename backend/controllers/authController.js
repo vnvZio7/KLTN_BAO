@@ -180,6 +180,8 @@ const getUserProfile = async (req, res) => {
         });
     } else if (req.account.role === "doctor") {
       user = await Doctor.findOne({ _id: req.user._id }).populate("accountId");
+    } else if (req.account.role === "admin") {
+      user = req.account;
     }
     res.json({ user });
   } catch (error) {

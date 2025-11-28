@@ -16,8 +16,8 @@ export const API_PATHS = {
   },
   ADMIN: {
     GET_DASHBOARD_DATA: "/api/admin/dashboard",
-    GET_ALL_SHOWS: "/api/admin/all-shows",
-    GET_ALL_BOOKINGS: "/api/admin/all-bookings",
+    GET_ALL_ACCOUNTS: "/api/admin/accounts",
+    GET_ALL_TRANSACTIONS: "/api/admin/transactions",
   },
   TESTS: {
     GET_ALL_TEST: "/api/tests",

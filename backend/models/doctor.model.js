@@ -25,6 +25,7 @@ const doctorSchema = new mongoose.Schema({
         "pending", // đã gửi - chờ admin duyệt
         "approved", // đã được duyệt - có thể hoạt động
         "rejected", // bị từ chối - cần sửa/gửi lại
+        "frozen", // tam dung
       ],
       default: "pending",
     },

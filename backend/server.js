@@ -16,6 +16,7 @@ import testResultRoutes from "./routes/testResultRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
 import homeworkAssignmentRoutes from "./routes/homeworkAssignmentRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 const app = express();
 dotenv.config();
@@ -51,6 +52,7 @@ app.use("/api/testresult", testResultRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/homework-assignments", homeworkAssignmentRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/admin", adminRoutes);
 
 //Start Server
 const PORT = process.env.PORT || 8080;
