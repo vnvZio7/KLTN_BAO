@@ -27,7 +27,7 @@ export default function ProtectedRoute({ allow }) {
 export function RequireDoctorApproved() {
   const { user, loading } = useUserContext();
   if (loading) return <LoadingScreen />;
-  if (user.approval.status !== "approved")
+  if (user?.approval?.status !== "approved")
     return <Navigate to="/pending" replace />;
   return <Outlet />;
 }
@@ -35,20 +35,20 @@ export function RequireDoctorApproved() {
 export function RequireDoctorPending() {
   const { user, loading } = useUserContext();
   if (loading) return <LoadingScreen />;
-  if (user.approval.status !== "pending")
+  if (user?.approval?.status !== "pending")
     return <Navigate to="/doctor" replace />;
   return <Outlet />;
 }
 export function RequireTestDone() {
   const { user, loading } = useUserContext();
   if (loading) return <LoadingScreen />;
-  if (user.testHistory.length === 0) return <Navigate to="/test" replace />;
+  if (user?.testHistory?.length === 0) return <Navigate to="/test" replace />;
   return <Outlet />;
 }
 
 export function RequireNoTest() {
   const { user, loading } = useUserContext();
   if (loading) return <LoadingScreen />;
-  if (user.testHistory.length > 0) return <Navigate to="/user" replace />;
+  if (user?.testHistory?.length > 0) return <Navigate to="/user" replace />;
   return <Outlet />;
 }

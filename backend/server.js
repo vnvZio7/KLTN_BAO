@@ -17,8 +17,8 @@ import appointmentRoutes from "./routes/appointmentRoutes.js";
 import homeworkAssignmentRoutes from "./routes/homeworkAssignmentRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import { app, server } from "./config/socket.js";
 
-const app = express();
 dotenv.config();
 // Middleware to handle CORS
 app.use(
@@ -57,6 +57,6 @@ app.use("/api/admin", adminRoutes);
 //Start Server
 const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port: ${PORT} `);
 });

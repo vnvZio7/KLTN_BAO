@@ -11,9 +11,14 @@ import PaymentPage from "./features/PaymentPage";
 import { useUserContext } from "../../context/userContext";
 import axiosInstance from "../../utils/axiosInstance";
 import { API_PATHS } from "../../utils/apiPaths";
+import PaymentModal from "../../components/payments/PaymentModal";
+import { generateTransactionCode } from "../../utils/helper";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 export default function Page() {
   const [active, setActive] = useState("stats");
+  const navigate = useNavigate();
   const {
     doctors,
     user,
@@ -23,6 +28,7 @@ export default function Page() {
     room,
     sendMessage,
     messages,
+    onlineUsers,
   } = useUserContext();
   const [appointments, setAppointments] = useState([]);
 
@@ -43,7 +49,24 @@ export default function Page() {
 
     fetchAppointments();
   }, []);
+  const [open, setOpen] = useState(false);
+  const [paymentData, setPaymentData] = useState(null);
 
+  const handleConfirm = async () => {
+    try {
+      const transaction = await axiosInstance.get(
+        API_PATHS.TRANSACTIONS.GET_TRANSACTION_BY_CODE(paymentData.orderCode)
+      );
+      console.log(transaction);
+      if (transaction) {
+        toast.success("Thanh toán thành công");
+      }
+      navigate("/user");
+    } catch (error) {
+      toast.error(error.message);
+      console.log(error);
+    }
+  };
   const [notifications, setNotifications] = useState([
     {
       id: "n1",
@@ -124,13 +147,30 @@ export default function Page() {
         <DoctorInfoPage
           doctor={currentDoctor}
           suggestions={doctors} // <— truyền mảng gợi ý
-          onSwitch={(picked) => {
+          onSwitch={({ picked, reason }) => {
+            toast.success(picked + reason);
+            // const diff = picked.pricePerWeek - currentDoctor.pricePerWeek;
+            // if (diff > 0) {
+            //   setPaymentData({
+            //     amount: diff,
+            //     orderCode: generateTransactionCode(),
+            //   });
+            //   setOpen(true); // 👉 mở modal
+            // }
             // (tuỳ chọn) gọi API yêu cầu đổi bác sĩ ở đây
-            setActive("doctor");
+            // setActive("doctor");
           }}
         />
       )}
-
+      {open && paymentData && (
+        <PaymentModal
+          amount={paymentData.amount}
+          orderCode={paymentData.orderCode}
+          open={open}
+          onClose={() => setOpen(false)}
+          onConfirmed={handleConfirm}
+        />
+      )}
       {active === "homework" && (
         <DoctorHomeworkPage assignments={assignments} />
       )}
@@ -142,6 +182,7 @@ export default function Page() {
           doctor={currentDoctor}
           messages={messages}
           setUnreadChat={setUnreadChat}
+          onlineUsers={onlineUsers}
         />
       )}
       {active === "notifications" && (

@@ -198,6 +198,11 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
   const [page, setPage] = useState(1);
   const pageSize = 4;
 
+  // 👉 thêm state cho popup nhập lý do
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [reason, setReason] = useState("");
+  const [showReasonModal, setShowReasonModal] = useState(false);
+
   const cards = useMemo(() => suggestions.map(mapDoctorCard), [suggestions]);
 
   const filtered = useMemo(() => {
@@ -243,13 +248,37 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
+      if (e.key === "Escape") {
+        if (showReasonModal) {
+          // nếu đang mở popup lý do thì đóng popup trước
+          setShowReasonModal(false);
+          setSelectedDoctor(null);
+          setReason("");
+        } else {
+          onClose?.();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, showReasonModal]);
 
   if (!open) return null;
+
+  const handleSubmitReason = () => {
+    if (!selectedDoctor || !reason.trim()) return;
+    // gửi cho parent để gọi API lên admin
+    onPick?.({
+      picked: selectedDoctor,
+      reason: reason.trim(),
+    });
+    // reset state + đóng modal chọn bác sĩ (tuỳ bạn muốn đóng hay để lại)
+    setShowReasonModal(false);
+    setSelectedDoctor(null);
+    setReason("");
+    onClose?.();
+  };
+
   return (
     <div className="fixed inset-0 z-50">
       <div
@@ -342,9 +371,10 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
                       </div>
                       <button
                         onClick={() => {
-                          const ok = window.confirm("Xác nhận đổi bác sĩ?");
-                          if (!ok) return;
-                          onPick?.(d);
+                          // 👉 mở popup nhập lý do
+                          setSelectedDoctor(d);
+                          setReason("");
+                          setShowReasonModal(true);
                         }}
                         className="px-3 py-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:opacity-95 text-sm shadow "
                       >
@@ -416,6 +446,55 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
           />
         </div>
       </div>
+
+      {/* 👉 Popup nhập lý do đổi bác sĩ */}
+      {showReasonModal && selectedDoctor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => {
+              setShowReasonModal(false);
+              setSelectedDoctor(null);
+              setReason("");
+            }}
+          />
+          <div className="relative w-full max-w-md mx-4 rounded-2xl bg-white p-5 shadow-2xl">
+            <h4 className="text-base font-semibold mb-2">
+              Lý do bạn muốn đổi bác sĩ
+            </h4>
+            <p className="text-sm text-slate-600 mb-3">
+              Yêu cầu đổi sang bác sĩ:{" "}
+              <span className="font-semibold">{selectedDoctor.name}</span>. Vui
+              lòng mô tả ngắn gọn lý do để đội ngũ admin xem xét.
+            </p>
+            <textarea
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 min-h-[100px]"
+              placeholder="Ví dụ: Không phù hợp phong cách làm việc, muốn tìm bác sĩ nhiều kinh nghiệm hơn về vấn đề của mình..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowReasonModal(false);
+                  setSelectedDoctor(null);
+                  setReason("");
+                }}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 text-sm hover:bg-slate-50"
+              >
+                Hủy
+              </button>
+              <button
+                disabled={!reason.trim()}
+                onClick={handleSubmitReason}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-sm hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Gửi admin
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -569,9 +648,9 @@ export default function DoctorInfoPage({ doctor, suggestions = [], onSwitch }) {
         open={openSwitch}
         onClose={() => setOpenSwitch(false)}
         suggestions={suggestions.filter((d) => d._id !== doctor._id)}
-        onPick={(picked) => {
-          setOpenSwitch(false);
-          onSwitch?.(picked); // picked.id = _id
+        onPick={({ picked, reason }) => {
+          // setOpenSwitch(false);
+          onSwitch?.({ picked, reason }); // picked.id = _id
         }}
       />
       <PreviewModal

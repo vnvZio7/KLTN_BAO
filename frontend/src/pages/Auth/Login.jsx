@@ -13,7 +13,6 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { setToken } = useUserContext();
 
   const navigate = useNavigate();
 
@@ -37,7 +36,6 @@ export default function Login() {
       // 🔹 Lưu token
 
       if (data.token) localStorage.setItem("accessToken", data.token);
-      setToken(data.token);
       if (data.account)
         localStorage.setItem("account", JSON.stringify(data.account));
       const role = data.account.role || "";

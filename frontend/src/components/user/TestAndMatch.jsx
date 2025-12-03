@@ -510,12 +510,14 @@ export default function TestAndMatch() {
       const { data } = await axiosInstance.get(
         API_PATHS.TRANSACTIONS.GET_TRANSACTION_BY_CODE(orderCode)
       );
-      console.log(data);
+      console.log("data: ", data);
       if (data.success) {
         toast.success("Thanh toan thanh cong");
         const response = await axiosInstance.post(API_PATHS.ROOMS.CREATE_ROOM, {
           doctorId: pickedDoctorId._id,
         });
+        console.log("response: ", response);
+
         const roomId = response.data.room._id;
         const transaction = await axiosInstance.patch(
           API_PATHS.TRANSACTIONS.UPDATE_TRANSACTION(data.transaction._id),
@@ -523,7 +525,8 @@ export default function TestAndMatch() {
             roomId,
           }
         );
-        console.log(answers["PHQ-9"]);
+        console.log("transaction: ", transaction);
+
         const testResultPHQ9 = await axiosInstance.post(
           API_PATHS.TEST_RESULTS.CREATE_TEST_RESULTS,
           {
@@ -542,8 +545,6 @@ export default function TestAndMatch() {
             band: levels["GAD-7"],
           }
         );
-        console.log(testResultPHQ9.data.testResult);
-        console.log(testResultPHQ9.data);
         console.log(testResultPHQ9);
         const updateUser = await axiosInstance.patch(
           API_PATHS.USERS.UPDATE_USER,
@@ -555,6 +556,7 @@ export default function TestAndMatch() {
             dominantSymptom: spec,
             doctorIds: doctors,
             currentDoctorId: pickedDoctorId._id,
+            walletBalance: pickedDoctorId.pricePerWeek,
           }
         );
         fetchUser();

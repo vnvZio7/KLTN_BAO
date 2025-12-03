@@ -32,8 +32,13 @@ const getUserByDoctorId = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const { testHistory, dominantSymptom, doctorIds, currentDoctorId } =
-      req.body;
+    const {
+      testHistory,
+      dominantSymptom,
+      doctorIds,
+      currentDoctorId,
+      walletBalance,
+    } = req.body;
     const user = await User.findByIdAndUpdate(
       req.user._id,
       {
@@ -42,6 +47,33 @@ const updateUser = async (req, res) => {
           dominantSymptom,
           doctorIds,
           currentDoctorId,
+          lastGAD7Score: testHistory[0].totalScore,
+          lastPHQ9Score: testHistory[1].totalScore,
+          walletBalance,
+        },
+      },
+      { new: true } // trả về document sau khi update
+    );
+    res.status(201).json({ message: "Đã cập nhật user thành công!", user });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const switchDoctor = async (req, res) => {
+  try {
+    const { currentDoctorId, walletBalance } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        $set: {
+          testHistory,
+          dominantSymptom,
+          doctorIds,
+          currentDoctorId,
+          lastGAD7Score: testHistory[0].totalScore,
+          lastPHQ9Score: testHistory[1].totalScore,
+          walletBalance,
         },
       },
       { new: true } // trả về document sau khi update

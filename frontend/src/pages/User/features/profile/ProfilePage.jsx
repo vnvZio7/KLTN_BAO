@@ -353,7 +353,7 @@ export default function ProfilePage({ user = {} }) {
           value={form.phone}
           onChange={(v) => update("phone", v)}
           type="tel"
-          placeholder="090xxxxxxx"
+          placeholder=""
           readOnly={!isEditing}
         />
         <Select

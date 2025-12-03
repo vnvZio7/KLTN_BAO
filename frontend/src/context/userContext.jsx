@@ -11,6 +11,7 @@ import axiosInstance from "../utils/axiosInstance";
 import { API_PATHS } from "../utils/apiPaths";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { io } from "socket.io-client";
 
 export const UserContext = createContext();
 
@@ -29,8 +30,10 @@ export const UserProvider = ({ children }) => {
   const [exercises, setExercises] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [onlineUsers, setOnlineUsers] = useState([]);
 
   const [loading, setLoading] = useState(true);
+  const [socket, setSocket] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [token, setToken] = useState(() => localStorage.getItem("accessToken"));
 
@@ -46,18 +49,56 @@ export const UserProvider = ({ children }) => {
     setMessages([]);
     localStorage.removeItem("accessToken");
   }, []);
+  const connectSocket = useCallback(() => {
+    // Nếu chưa đăng nhập thì không tạo socket
+    if (!user) return;
 
+    // Nếu socket đã tồn tại và đã kết nối → không tạo lại
+    if (socket && socket.connected) return;
+
+    const s = io(
+      import.meta.env.VITE_BASE_URL,
+      {
+        query: {
+          userId: user._id,
+        },
+      },
+      {
+        autoConnect: false,
+      }
+    );
+
+    setSocket(s);
+
+    s.on("getOnlineUsers", (userIds) => {
+      console.log(userIds);
+      setOnlineUsers({ onlineUsers: userIds });
+    });
+  }, [user, socket]);
+  const disConnectSocket = useCallback(() => {
+    if (socket) {
+      console.log(socket);
+      socket.disconnect();
+    }
+    console.log("socket disconnec");
+    setSocket(null);
+  }, [socket]);
   const getToken = useCallback(() => {
     return localStorage.getItem("accessToken");
   }, []);
-
+  useEffect(() => {
+    if (user && !socket) {
+      connectSocket();
+    }
+  }, [user, socket]);
   const handleLogout = useCallback(() => {
     setIsLoggingOut(true);
     localStorage.clear();
     clearUser();
+    disConnectSocket();
     navigate("/login");
     scrollTo(0, 0);
-  }, [clearUser, navigate]);
+  }, [clearUser, navigate, disConnectSocket]);
 
   // ---------- API calls ----------
   const fetchExercises = useCallback(async () => {
@@ -92,13 +133,15 @@ export const UserProvider = ({ children }) => {
       console.error("fetchRoom error:", error?.message || error);
     }
   }, []);
-
+  const fetchRooms = useCallback(async () => {
+    const allRooms = await fetchRoom();
+    setRooms(allRooms);
+  });
   const fetchMessages = useCallback(async (roomId) => {
     try {
       const { data } = await axiosInstance.get(
         API_PATHS.MESSAGES.GET_MESSAGES_BY_ROOM_ID(roomId)
       );
-      console.log(data.messages);
       setMessages(data.messages);
     } catch (error) {
       console.error("fetch Message error:", error?.message || error);
@@ -115,15 +158,35 @@ export const UserProvider = ({ children }) => {
         }
       );
       console.log(data.message);
-      if (data.sucess) {
+      if (data.success) {
         await fetchMessages(roomId);
+        await fetchRooms();
       }
     } catch (error) {
       console.error("send Message error:", error?.message || error);
     }
   }, []);
 
+  const subcribeToMessages = useCallback(
+    (roomId) => {
+      if (!roomId) return;
+      if (!socket) return;
+      console.log("socket on");
+      socket.on("newMessage", (msg) => {
+        if (msg.roomId.toString() !== roomId.toString()) return;
+        setMessages((prev) => [...prev, msg]);
+      });
+    },
+    [socket]
+  );
+
+  const unSubcribeToMessages = useCallback(() => {
+    if (!socket) return;
+    socket.off("newMessage");
+  }, [socket]);
+
   const fetchUser = useCallback(async () => {
+    console.log(token);
     if (!token) {
       clearUser();
       setLoading(false);
@@ -157,7 +220,6 @@ export const UserProvider = ({ children }) => {
       const dataUser = response.data.user;
       setUser(dataUser);
       // console.log("profile >>>", dataUser);
-
       const accountRole = dataUser?.accountId?.role || dataUser?.role;
 
       // ----- USER -----
@@ -185,8 +247,7 @@ export const UserProvider = ({ children }) => {
             resPatients.map((u) => fetchAssignment(u._id))
           );
           setAssignments(allAssignments.flat());
-          const allRooms = await fetchRoom();
-          setRooms(allRooms);
+          await fetchRooms();
         } else {
           setAssignments([]);
         }
@@ -237,7 +298,6 @@ export const UserProvider = ({ children }) => {
     () => ({
       user,
       fetchUser,
-      setToken,
       doctors,
       currentDoctor,
       loading,
@@ -256,12 +316,14 @@ export const UserProvider = ({ children }) => {
       setLoading,
       accounts,
       transactions,
+      onlineUsers,
+      unSubcribeToMessages,
+      subcribeToMessages,
     }),
     [
       user,
       messages,
       fetchUser,
-      setToken,
       doctors,
       currentDoctor,
       loading,
@@ -279,6 +341,9 @@ export const UserProvider = ({ children }) => {
       setLoading,
       accounts,
       transactions,
+      onlineUsers,
+      unSubcribeToMessages,
+      subcribeToMessages,
     ]
   );
 

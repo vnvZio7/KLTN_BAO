@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { prettyTime } from "../../../../utils/helper";
 import { INITIAL_MESSAGES } from "../../../../utils/data";
+import { useUserContext } from "../../../../context/userContext";
 
 export default function ChatPage({
   room,
@@ -11,15 +12,27 @@ export default function ChatPage({
   onSend,
   onComplete, // optional: callback khi đánh dấu hoàn thành
   onSendComplete, // optional: callback gửi yêu cầu hoàn thành tới bác sĩ/backend
+  onlineUsers,
 }) {
   const [text, setText] = useState("");
   const [completed, setCompleted] = useState(false);
   const listRef = useRef(null);
-
+  const { subcribeToMessages, unSubcribeToMessages } = useUserContext();
+  useEffect(() => {
+    if (!room?._id) return;
+    subcribeToMessages(room._id);
+    return () => unSubcribeToMessages();
+  }, [room?._id, subcribeToMessages, unSubcribeToMessages]);
   console.log(messages);
-  const send = async () => {
+  const send = async (e) => {
+    e.preventDefault();
     if (!text.trim()) return;
-    await onSend({ roomId: room._id, content: text });
+    try {
+      await onSend({ roomId: room._id, content: text });
+      setText("");
+    } catch (error) {
+      console.error("Failed to send message: ", error);
+    }
     // setMessages((prev) => [...prev, me]);
     // setText("");
     // setTimeout(() => {
@@ -103,7 +116,11 @@ export default function ChatPage({
         />
         <div>
           <div className="font-medium">{doctor.accountId.fullName}</div>
-          <div className="text-xs text-emerald-700">● Trực tuyến</div>
+          {onlineUsers.onlineUsers.includes(doctor._id) ? (
+            <div className="text-xs text-green-700">● Online</div>
+          ) : (
+            <div className="text-xs text-gray-500">● Offline</div>
+          )}
         </div>
       </div>
 
@@ -157,7 +174,7 @@ export default function ChatPage({
           placeholder="Nhập tin nhắn…"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
+          onKeyDown={(e) => e.key === "Enter" && send(e)}
         />
         <button
           onClick={send}

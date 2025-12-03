@@ -14,6 +14,8 @@ const userSchema = new mongoose.Schema(
         ref: "TestResult",
       },
     ],
+    lastGAD7Score: Number,
+    lastPHQ9Score: Number,
     dominantSymptom: String, // Lo âu, Trầm cảm
     aiNotes: String, // Ghi chú AI (giải thích ngắn)
     doctorIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Doctor" }],

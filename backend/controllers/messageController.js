@@ -1,3 +1,4 @@
+import { getReceiverSocketId, io } from "../config/socket.js";
 import Message from "../models/message.model.js";
 import Room from "../models/room.model.js";
 
@@ -43,10 +44,18 @@ const sendMessage = async (req, res) => {
 
     // (Tuỳ chọn) Cập nhật lastMessage trong Room nếu bạn có field này
     try {
-      await Room.findByIdAndUpdate(roomId, {
+      const room = await Room.findByIdAndUpdate(roomId, {
         lastMessageAt: new Date(),
         lastMessage: content || "",
       });
+      const isSenderUser = room.userId.equals(req.user._id);
+
+      const receiverId = isSenderUser ? room.doctorId : room.userId;
+      console.log(receiverId);
+      const receiverSocketId = getReceiverSocketId(receiverId.toString());
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", message);
+      }
     } catch (e) {
       console.warn("Không update được Room, kiểm tra Room model sau >>>", e);
     }

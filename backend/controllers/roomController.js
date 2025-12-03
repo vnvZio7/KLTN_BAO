@@ -22,7 +22,6 @@ const getRoom = async (req, res) => {
       status: "active",
       $or: [{ doctorId: myId }, { userId: myId }],
     }).lean();
-    console.log("room: ", room);
     if (!room) return res.status(404).json({ message: "Room not found" });
     res.json({ room });
   } catch (error) {
@@ -32,11 +31,13 @@ const getRoom = async (req, res) => {
 
 const createRoom = async (req, res) => {
   try {
+    console.log(req.user);
     const room = await Room.create({
       userId: req.user._id,
       doctorId: req.body.doctorId,
     });
-
+    console.log(room);
+    console.log(req.body.doctorId);
     res.status(201).json({ message: "Đã tạo room thành công!", room });
   } catch (err) {
     console.error("create error:", err);

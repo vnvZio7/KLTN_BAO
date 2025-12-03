@@ -203,7 +203,7 @@ export default function UserStatsPage({ appointments = [], messages = [] }) {
                   </span>
                 </div>
               </div>
-              <div className="text-[11px] text-slate-400">Tối đa 27</div>
+              <div className="text-[11px] text-slate-400">Tối đa 21</div>
             </div>
 
             <div className="h-px bg-slate-100" />

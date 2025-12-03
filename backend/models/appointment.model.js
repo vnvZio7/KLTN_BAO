@@ -11,13 +11,10 @@ const appointmentSchema = new mongoose.Schema({
   endTime: { type: Date, index: true },
   status: {
     type: String,
-    enum: ["pending", "paid", "confirmed", "completed", "cancelled"],
+    enum: ["pending", "completed", "cancelled"],
     default: "pending",
   },
   reason: String,
-  meetingURL: String,
-  session_count: Number,
-  paymentId: { type: mongoose.Schema.Types.ObjectId, ref: "Transaction" },
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -5,18 +5,37 @@ import Transaction from "../models/transaction.model.js";
 // @access  Private (Admin)
 const getTransactions = async (req, res) => {
   try {
-    const transactions = await Transaction.find({ userId: req.user._id })
+    // const transactions = await Transaction.find({ userId: req.user._id })
+    //   .populate({
+    //     path: "doctorId",
+    //     populate: {
+    //       path: "accountId",
+    //       model: "Account",
+    //       select: "-password",
+    //     },
+    //   })
+    //   .sort({
+    //     createdAt: -1,
+    //   });
+    const transactions = await Transaction.find()
       .populate({
-        path: "doctorId",
+        path: "roomId",
+        match: { userId: req.user._id }, // lọc ngay trong populate
         populate: {
-          path: "accountId",
-          model: "Account",
-          select: "-password",
+          path: "doctorId",
+          model: "Doctor",
+          populate: {
+            path: "accountId",
+            model: "Account",
+            select: "-password",
+          },
         },
       })
+
       .sort({
         createdAt: -1,
       });
+    console.log(transactions);
     res.json({ transactions });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });

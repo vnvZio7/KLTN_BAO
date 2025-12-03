@@ -30,7 +30,7 @@ const doctorSchema = new mongoose.Schema({
       default: "pending",
     },
   },
-  rating: { type: Number, default: 0 },
+  rating: { type: Number, default: 5 },
   reviewsCount: { type: Number, default: 0 },
 });
 doctorSchema.index({ specializations: 1, modalities: 1, pricePerWeek: 1 });

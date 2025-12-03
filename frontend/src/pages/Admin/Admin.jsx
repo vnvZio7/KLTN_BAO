@@ -275,7 +275,10 @@ export default function AdminPortal() {
     setLoading,
     accounts,
     transactions,
+    onlineUsers,
   } = useUserContext();
+
+  console.log({ onlineUsers });
   const [nav, setNav] = useState("dashboard");
   const [stats] = useState(ADMIN_STATS_INIT);
   const [dataDoctors, setDataDoctors] = useState([]);

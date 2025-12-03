@@ -7,8 +7,7 @@ const homeworkSubmissionSchema = new mongoose.Schema(
       ref: "HomeworkAssignment",
       index: true,
     },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    answers: mongoose.Schema.Types.Mixed, // JSON các phản hồi/bài làm
+    answers: String, // JSON các phản hồi/bài làm
     attachments: [String],
     selfRating: { type: Number, min: 1, max: 5 }, // cảm nhận hiệu quả
     moodBefore: { type: Number, min: 1, max: 10 },

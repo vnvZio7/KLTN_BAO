@@ -44,6 +44,7 @@ import {
 } from "../../utils/helper";
 import { THERAPY_METHODS } from "../../utils/data";
 import toast from "react-hot-toast";
+import { useRef } from "react";
 
 /**
  * Doctor Portal — single file demo for React + Vite + Tailwind
@@ -235,6 +236,7 @@ export default function DoctorPage() {
     exercises,
     assignments,
     sendMessage,
+    onlineUsers,
   } = useUserContext();
 
   const [mode, setMode] = useState("template"); // "template" | "custom"
@@ -312,18 +314,6 @@ export default function DoctorPage() {
     // );
     return { total, activeChats, upcomingToday, pendingReq, homeworkDueToday };
   }, [patients, calls, callRequests]);
-  console.log("rooms: ", rooms);
-  const sendMsg = async ({ roomId, text }) => {
-    if (!text.trim()) return;
-
-    // setPatients((ps) =>
-    //   ps.map((p) =>
-    //     p._id === patientId
-    //       ? { ...p, messages: [...(p.messages || []), msg], unread: 0 }
-    //       : p
-    //   )
-    // );
-  };
 
   // ---------------------- Actions (mocked) ----------------------
   const notify = (text, type = "info") =>
@@ -687,6 +677,7 @@ export default function DoctorPage() {
             patients={patients}
             rooms={rooms}
             activeId={activePatientId}
+            onlineUsers={onlineUsers}
           />
         )}
 
@@ -2026,24 +2017,41 @@ function MessagesView({
   activeId,
   onDoctorComplete, // optional
   onRespondComplete, // optional
+  onlineUsers,
 }) {
   const [activePatientId, setActivePatientId] = useState(
     activeId || patients[0]._id
   );
-  const { messages, fetchMessages, sendMessage } = useUserContext();
+  const {
+    messages,
+    fetchMessages,
+    sendMessage,
+    subcribeToMessages,
+    unSubcribeToMessages,
+  } = useUserContext();
   const [text, setText] = useState("");
   const [room, setRoom] = useState([]);
   const ap = patients.find((p) => p._id === activePatientId) || patients[0];
   const msgs = messages || [];
-
+  const listRef = useRef(null);
   // Mark read khi mở hội thoại
   useEffect(() => {
     const r = rooms.find((r) => r.userId === ap._id);
-
+    if (!r) return;
     setRoom(r);
     fetchMessages(r._id);
-  }, [ap?._id]);
-
+  }, [ap?._id, rooms, fetchMessages]);
+  useEffect(() => {
+    if (!room?._id) return;
+    subcribeToMessages(room._id);
+    return () => unSubcribeToMessages();
+  }, [room?._id, subcribeToMessages, unSubcribeToMessages]);
+  useEffect(() => {
+    listRef.current?.scrollTo({
+      top: listRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages]);
   const isCompleted = ap?.chatStatus === "completed";
   const pendingUserRequest =
     ap?.completeRequest?.status === "pending" &&
@@ -2140,7 +2148,12 @@ function MessagesView({
                 ap?._id === p._id ? "border-zinc-900" : "border-zinc-200"
               }`}
             >
-              <Avatar name={p.accountId.fullName} />
+              <div className="relative">
+                <Avatar name={p.accountId.fullName} />
+                {onlineUsers.onlineUsers.includes(p._id) && (
+                  <span className="absolute bottom-0.5 size-2 rounded-full ring-2 ring-zinc-900 bg-green-500 right-0.5"></span>
+                )}
+              </div>
               <div className="min-w-0">
                 <div className="truncate text-sm font-medium">
                   {p.accountId.fullName}
@@ -2163,8 +2176,10 @@ function MessagesView({
           <div className="text-sm font-semibold">{ap.accountId.fullName}</div>
           {isCompleted ? (
             <Badge tone="default">Đã hoàn thành</Badge>
+          ) : onlineUsers.onlineUsers.includes(ap._id) ? (
+            <Badge tone="success">Online</Badge>
           ) : (
-            <Badge tone="success">Trực tuyến</Badge>
+            <Badge tone="danger">Offline</Badge>
           )}
 
           <div className="ml-auto flex items-center gap-2">
@@ -2208,7 +2223,7 @@ function MessagesView({
         )}
 
         {/* Messages */}
-        <div className="h-[50vh] overflow-auto p-4">
+        <div ref={listRef} className="h-[50vh] overflow-auto p-4">
           {msgs.length === 0 ? (
             <Empty icon={MessageSquareText} title="Chưa có tin nhắn" />
           ) : (
