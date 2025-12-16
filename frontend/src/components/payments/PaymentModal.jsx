@@ -6,6 +6,7 @@ import { useApi } from "../../providers/Api";
 export default function PaymentModal({
   open,
   onClose,
+  required = false,
   onConfirmed, // optional: called when user clicks "Đã chuyển khoản"
   amount, // number (VND)
   orderCode, // mã/ghi chú chuyển khoản (e.g. "POMERA-123456")
@@ -86,13 +87,15 @@ export default function PaymentModal({
               <div className="text-lg font-semibold">Thanh toán bảo mật</div>
               <div className="text-xs text-zinc-500">{message}</div>
             </div>
-            <button
-              className="rounded-xl p-2 hover:bg-zinc-50"
-              onClick={onClose}
-              aria-label="Đóng"
-            >
-              <X className="h-5 w-5 text-zinc-600" />
-            </button>
+            {!required && (
+              <button
+                className="rounded-xl p-2 hover:bg-zinc-50"
+                onClick={onClose}
+                aria-label="Đóng"
+              >
+                <X className="h-5 w-5 text-zinc-600" />
+              </button>
+            )}
           </div>
 
           {/* Body */}
@@ -178,12 +181,14 @@ export default function PaymentModal({
               Thanh toán an toàn & mã hóa. Hỗ trợ 24/7 nếu có lỗi ghi nhận.
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={onClose}
-                className="rounded-lg border px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
-              >
-                Đóng
-              </button>
+              {!required && (
+                <button
+                  onClick={onClose}
+                  className="rounded-lg border px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                >
+                  Đóng
+                </button>
+              )}
               <button
                 onClick={onConfirmed}
                 className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"

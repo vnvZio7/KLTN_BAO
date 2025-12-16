@@ -1,4 +1,7 @@
 import React, { useMemo, useState } from "react";
+import axiosInstance from "../../../../utils/axiosInstance";
+import { API_PATHS } from "../../../../utils/apiPaths";
+import { dateFormat, prettyTime } from "../../../../utils/helper";
 
 export default function NotificationsPage({ notifications, setNotifications }) {
   const [filter, setFilter] = useState("all");
@@ -9,36 +12,16 @@ export default function NotificationsPage({ notifications, setNotifications }) {
     );
   }, [notifications, filter]);
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
+    await axiosInstance.patch(API_PATHS.NOTIFY.UPDATE_MARK_ALL_READ);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
-  const markOne = (id) => {
+  const markOne = async (id) => {
+    await axiosInstance.patch(API_PATHS.NOTIFY.UPDATE_MARK_READ_ONE(id));
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      prev.map((n) => (n._id === id ? { ...n, read: true } : n))
     );
-  };
-  const addMock = (type = "system") => {
-    const id = Math.random().toString(36).slice(2);
-    const titleMap = {
-      appointment: "Lịch hẹn sắp diễn ra",
-      message: "Bạn có tin nhắn mới từ bác sĩ",
-      system: "Cập nhật hệ thống",
-    };
-    const bodyMap = {
-      appointment: "Nhắc: hẹn video lúc 14:00 hôm nay.",
-      message: 'Bác sĩ Minh: "Hẹn bạn 16:00 mai nhé."',
-      system: "Tính năng Thông báo đã được nâng cấp.",
-    };
-    const newItem = {
-      id,
-      type,
-      title: titleMap[type],
-      body: bodyMap[type],
-      time: new Date().toISOString(),
-      read: false,
-    };
-    setNotifications((prev) => [newItem, ...prev]);
   };
 
   return (
@@ -52,30 +35,12 @@ export default function NotificationsPage({ notifications, setNotifications }) {
             onChange={(e) => setFilter(e.target.value)}
           >
             <option value="all">Tất cả</option>
-            <option value="appointment">Lịch hẹn</option>
-            <option value="message">Tin nhắn</option>
+            <option value="call">Lịch hẹn</option>
+            <option value="homework">Bài tập về nhà</option>
             <option value="system">Hệ thống</option>
           </select>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => addMock("appointment")}
-            className="px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-sm"
-          >
-            Giả lập (Lịch hẹn)
-          </button>
-          <button
-            onClick={() => addMock("message")}
-            className="px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-sm"
-          >
-            Giả lập (Tin nhắn)
-          </button>
-          <button
-            onClick={() => addMock("system")}
-            className="px-3 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-sm"
-          >
-            Giả lập (Hệ thống)
-          </button>
           <button
             onClick={markAllRead}
             className="px-3 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 text-sm"
@@ -90,7 +55,7 @@ export default function NotificationsPage({ notifications, setNotifications }) {
           <div className="p-6 text-slate-500">Không có thông báo.</div>
         )}
         {filtered.map((n) => (
-          <div key={n.id} className="p-4 flex items-start gap-3">
+          <div key={n._id} className="p-4 flex items-start gap-3">
             <div
               className={`mt-1 h-2.5 w-2.5 rounded-full ${
                 n.read ? "bg-slate-300" : "bg-red-500"
@@ -101,21 +66,21 @@ export default function NotificationsPage({ notifications, setNotifications }) {
                 <div className="font-medium">
                   {n.title}
                   <span className="ml-2 text-xs px-2 py-0.5 rounded-full border border-slate-300 text-slate-600">
-                    {n.type === "appointment"
+                    {n.type === "call"
                       ? "Lịch hẹn"
-                      : n.type === "message"
-                      ? "Tin nhắn"
+                      : n.type === "homework"
+                      ? "Bài tập về nhà"
                       : "Hệ thống"}
                   </span>
                 </div>
                 <div className="text-xs text-slate-500">
-                  {new Date(n.time).toLocaleString("vi-VN")}
+                  {prettyTime(n.createdAt)}
                 </div>
               </div>
-              <div className="text-slate-700 mt-1 text-sm">{n.body}</div>
+              <div className="text-slate-700 mt-1 text-sm">{n.message}</div>
               {!n.read && (
                 <button
-                  onClick={() => markOne(n.id)}
+                  onClick={() => markOne(n._id)}
                   className="mt-2 text-xs px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"
                 >
                   Đánh dấu đã đọc

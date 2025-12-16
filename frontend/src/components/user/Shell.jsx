@@ -1,4 +1,5 @@
 import React from "react";
+import { currencyVND } from "../../lib/utils";
 
 export default function Shell({
   active,
@@ -55,7 +56,9 @@ export default function Shell({
                 <div className="font-medium">
                   {user?.accountId.fullName || "Người dùng"}
                 </div>
-                <div className="text-slate-600">{user?.accountId.email}</div>
+                <div className="text-slate-600 text-xs mt-px">
+                  Số dư: {currencyVND(user.walletBalance)}
+                </div>
               </div>
             </div>
 

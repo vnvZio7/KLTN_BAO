@@ -18,17 +18,12 @@ const homeworkAssignmentSchema = new mongoose.Schema(
     },
     content: String, // nếu custom
     difficulty: { type: String, enum: ["easy", "medium", "hard"] },
-    frequency: {
-      type: String,
-      enum: ["once", "daily", "weekly"],
-      default: "daily",
-    },
     attachments: [String],
     dueDate: Date, // hạn hoàn thành
     estimatedMinutes: Number,
     status: {
       type: String,
-      enum: ["assigned", "in_progress", "completed", "overdue"],
+      enum: ["assigned", "completed", "overdue"],
       default: "assigned",
     },
     aiSuggested: { type: Boolean, default: false },

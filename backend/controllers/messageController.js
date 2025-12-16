@@ -1,3 +1,4 @@
+import { getReceiverSocketId, io } from "../config/socket.js";
 import Message from "../models/message.model.js";
 import Room from "../models/room.model.js";
 
@@ -43,10 +44,18 @@ const sendMessage = async (req, res) => {
 
     // (Tuỳ chọn) Cập nhật lastMessage trong Room nếu bạn có field này
     try {
-      await Room.findByIdAndUpdate(roomId, {
+      const room = await Room.findByIdAndUpdate(roomId, {
         lastMessageAt: new Date(),
         lastMessage: content || "",
       });
+      const isSenderUser = room.userId.equals(req.user._id);
+
+      const receiverId = isSenderUser ? room.doctorId : room.userId;
+      console.log(receiverId);
+      const receiverSocketId = getReceiverSocketId(receiverId.toString());
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", message);
+      }
     } catch (e) {
       console.warn("Không update được Room, kiểm tra Room model sau >>>", e);
     }
@@ -72,4 +81,26 @@ const getMessageByRoomId = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-export { getMessages, sendMessage, getMessageByRoomId };
+
+const readMessageByRoomId = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const messages = await Message.updateMany(
+      {
+        roomId: roomId,
+        senderType: { $ne: req.account.role }, // ví dụ: "user" hoặc "doctor"
+      },
+      {
+        $set: {
+          read: true, // hoặc trường bạn muốn update
+        },
+      }
+    );
+
+    console.log(messages);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+export { getMessages, sendMessage, getMessageByRoomId, readMessageByRoomId };

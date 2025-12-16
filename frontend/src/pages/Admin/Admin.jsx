@@ -25,6 +25,9 @@ import {
   SunDim,
   ChevronRight,
   ChevronsRightIcon,
+  UserCog2,
+  ArrowRight,
+  XCircle,
 } from "lucide-react";
 import { useUserContext } from "../../context/userContext";
 import { currencyVND } from "../../lib/utils";
@@ -33,6 +36,8 @@ import { useCallback } from "react";
 import { useEffect } from "react";
 import toast from "react-hot-toast";
 import { prettyTime } from "../../utils/helper";
+import { API_PATHS } from "../../utils/apiPaths";
+import { fmtDateTime } from "../../lib/date";
 
 /* --------------------------- Tiny UI primitives --------------------------- */
 function IconBtn({ children, icon: Icon, className = "", ...rest }) {
@@ -114,13 +119,14 @@ const fmtDate = (iso) =>
     month: "2-digit",
     year: "numeric",
   });
-const fmtDateTime = (iso) =>
-  new Date(iso).toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-  });
+// const fmtDateTime = (iso) =>
+//   new Date(iso).toLocaleString("vi-VN", {
+//     hour: "2-digit",
+//     minute: "2-digit",
+//     day: "2-digit",
+//     month: "2-digit",
+//     year: "2-digit",
+//   });
 
 /* -------------------------------- Mock data ------------------------------ */
 const ADMIN_STATS_INIT = {
@@ -275,7 +281,14 @@ export default function AdminPortal() {
     setLoading,
     accounts,
     transactions,
+    onlineUsers,
+    userSwitchs,
+    setUserSwitchs,
+    notifications,
+    setNotifications,
   } = useUserContext();
+
+  console.log({ onlineUsers });
   const [nav, setNav] = useState("dashboard");
   const [stats] = useState(ADMIN_STATS_INIT);
   const [dataDoctors, setDataDoctors] = useState([]);
@@ -284,15 +297,15 @@ export default function AdminPortal() {
       setDataDoctors(doctors);
     }
   }, [doctors]);
-  const [notifications, setNotifications] = useState([
-    {
-      id: uid(),
-      type: "info",
-      text: "1 hồ sơ bác sĩ đang chờ duyệt",
-      at: new Date().toISOString(),
-      read: false,
-    },
-  ]);
+  // const [notifications, setNotifications] = useState([
+  //   {
+  //     id: uid(),
+  //     type: "info",
+  //     text: "1 hồ sơ bác sĩ đang chờ duyệt",
+  //     at: new Date().toISOString(),
+  //     read: false,
+  //   },
+  // ]);
 
   // Exercise modal state (single-file management)
   const [openExerciseModal, setOpenExerciseModal] = useState(false);
@@ -308,8 +321,21 @@ export default function AdminPortal() {
 
   // Actions
   const pendingDoctors = useMemo(
-    () => dataDoctors.filter((d) => d.approval.status === "pending").length,
+    () =>
+      dataDoctors.filter((d) => d.approval.status === "pending").length || 0,
     [dataDoctors]
+  );
+  const pendingUsers = useMemo(
+    () =>
+      userSwitchs.filter(
+        (d) => d?.switchDoctor?.at(-1).switchDoctorStatus === "pending"
+      ).length || 0,
+    [userSwitchs]
+  );
+
+  const uread = useMemo(
+    () => notifications.filter((d) => !d.read).length || 0,
+    [notifications]
   );
   // const approveDoctor = useCallback(
   //   async (id) => {
@@ -393,7 +419,88 @@ export default function AdminPortal() {
     },
     [setDataDoctors]
   );
+  const onUpdateSwitchDoctor = useCallback(
+    async ({ userId, status, reason = "", fee = 0 }) => {
+      try {
+        setLoading(true);
+        const res = await axiosInstance.patch(
+          API_PATHS.ADMIN.UPDATE_SWITCH_DOCTOR,
+          { userId, status, reason, fee }
+        );
 
+        // Nếu server xóa doctor khi rejected
+        if (res?.data?.success) {
+          toast.success(res.data.message);
+          setUserSwitchs((ds) =>
+            ds.map((d) => {
+              if (d._id !== userId) return d;
+
+              if (
+                !Array.isArray(d.switchDoctor) ||
+                d.switchDoctor.length === 0
+              ) {
+                return d;
+              }
+
+              const updatedSwitchDoctor = d.switchDoctor.map((sd, idx) =>
+                idx === d.switchDoctor.length - 1
+                  ? {
+                      ...sd,
+                      switchDoctorStatus: status,
+                      reason,
+                    }
+                  : sd
+              );
+
+              return {
+                ...d,
+                switchDoctor: updatedSwitchDoctor,
+              };
+            })
+          );
+
+          return;
+        }
+
+        const updated = res.data.user; // backend trả field "data"
+        toast.success("Cập nhật trạng thái thành công");
+        // Cập nhật UI
+        setUserSwitchs((ds) =>
+          ds.map((d) =>
+            d._id === userId
+              ? {
+                  ...d,
+                  walletBalance: updated.walletBalance,
+                  currentDoctorId: updated.currentDoctorId,
+                  switchDoctor: {
+                    ...(d.switchDoctor || {}),
+                    switchDoctorStatus:
+                      updated.switchDoctor?.switchDoctorStatus || status,
+                  },
+                }
+              : d
+          )
+        );
+      } catch (error) {
+        toast.error(error.response.data.message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [setDataDoctors]
+  );
+  const onMarkRead = async () => {
+    try {
+      await axiosInstance.patch(API_PATHS.NOTIFY.UPDATE_MARK_ALL_READ);
+
+      // sync UI
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+      toast.success("Đã đánh dấu tất cả thông báo là đã đọc");
+    } catch (error) {
+      toast.error("Không thể cập nhật thông báo");
+    }
+  };
   const openNewExercise = () => {
     setExerciseDraft({
       id: null,
@@ -411,15 +518,16 @@ export default function AdminPortal() {
     setOpenExerciseModal(true);
   };
   const saveExercise = () => {
-    const payload = {
-      ...exerciseDraft,
-      target: (exerciseDraft.targetSymptoms || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      updatedAt: new Date().toISOString(),
-      id: exerciseDraft._id || uid(),
-    };
+    alert("Demo");
+    // const payload = {
+    //   ...exerciseDraft,
+    //   target: (exerciseDraft.targetSymptoms || "")
+    //     .split(",")
+    //     .map((s) => s.trim())
+    //     .filter(Boolean),
+    //   updatedAt: new Date().toISOString(),
+    //   id: exerciseDraft._id || uid(),
+    // };
     // setexercises((list) => {
     //   const i = list.findIndex((e) => e._id === payload._id);
     //   return i >= 0
@@ -452,20 +560,34 @@ export default function AdminPortal() {
             { key: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
             { key: "accounts", label: "Tài khoản", icon: Users },
             { key: "doctors", label: "Phê duyệt bác sĩ", icon: UserCog },
+            { key: "users", label: "Phê duyệt đổi bác sĩ", icon: UserCog2 },
             { key: "exercises", label: "Bài tập trị liệu", icon: FileStack },
             { key: "notifications", label: "Thông báo", icon: Bell },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setNav(key)}
-              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-zinc-50 ${
-                nav === key ? "bg-zinc-100" : ""
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-zinc-300 ${
+                nav === key ? "bg-zinc-200" : ""
               }`}
             >
               <Icon className="h-4 w-4" />
               <span>{label}</span>
               {key === "doctors" && pendingDoctors > 0 && (
-                <span className="ml-auto text-xs">{pendingDoctors}</span>
+                <span className="ml-auto text-sm text-rose-500 underline">
+                  {pendingDoctors}
+                </span>
+              )}
+
+              {key === "users" && pendingUsers > 0 && (
+                <span className="ml-auto text-sm text-rose-500 underline">
+                  {pendingUsers}
+                </span>
+              )}
+              {key === "notifications" && uread > 0 && (
+                <span className="ml-auto text-sm text-rose-500 underline">
+                  {uread}
+                </span>
               )}
             </button>
           ))}
@@ -504,16 +626,24 @@ export default function AdminPortal() {
             onUpdateApproval={updateApproval}
           />
         )}
+        {nav === "users" && (
+          <AdminUsers
+            users={userSwitchs}
+            onUpdateSwitchDoctor={onUpdateSwitchDoctor}
+          />
+        )}
         {nav === "exercises" && (
           <AdminExercises
             exercises={exercises}
             onNew={openNewExercise}
             onEdit={openEditExercise}
-            // onDelete={deleteExercise}
           />
         )}
         {nav === "notifications" && (
-          <NotificationsView notifications={notifications} />
+          <NotificationsView
+            notifications={notifications}
+            onMarkRead={onMarkRead}
+          />
         )}
 
         {/* Modal thêm/sửa bài tập */}
@@ -1377,29 +1507,46 @@ function DoctorDetailModal({ doctor, onClose, onUpdateApproval }) {
   );
 }
 
-function RejectReasonModal({ open, onClose, onSubmit }) {
+function RejectReasonModal({
+  open,
+  onClose,
+  onSubmit,
+  // 👇 các props tuỳ biến để dùng chung nhiều ngữ cảnh
+  title = "Từ chối hồ sơ bác sĩ",
+  description = "Bạn có chắc muốn từ chối? Hãy nhập lý do:",
+  placeholder = "Nhập lý do từ chối...",
+  confirmLabel = "Xác nhận",
+  cancelLabel = "Hủy",
+  minLength = 3,
+}) {
   const [reason, setReason] = useState("");
+
+  // Mỗi lần mở modal mới -> clear lý do cũ
+  useEffect(() => {
+    if (open) setReason("");
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-55 flex items-center justify-center bg-black/40"
       onClick={onClose}
     >
       <div
         className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-lg font-semibold">Từ chối hồ sơ bác sĩ</div>
-        <p className="mt-2 text-sm text-zinc-600">
-          Bạn có chắc muốn từ chối? Hãy nhập lý do:
-        </p>
+        <div className="text-lg font-semibold">{title}</div>
+
+        {description && (
+          <p className="mt-2 text-sm text-zinc-600">{description}</p>
+        )}
 
         <textarea
-          className="mt-3 w-full rounded-xl border border-zinc-300 p-3 text-sm outline-none"
+          className="mt-3 w-full rounded-xl border border-zinc-300 p-3 text-sm outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500/40"
           rows={4}
-          placeholder="Nhập lý do từ chối..."
+          placeholder={placeholder}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
         />
@@ -1409,20 +1556,20 @@ function RejectReasonModal({ open, onClose, onSubmit }) {
             className="rounded-xl border px-4 py-2 text-sm hover:bg-zinc-100"
             onClick={onClose}
           >
-            Hủy
+            {cancelLabel}
           </button>
 
           <button
             className="rounded-xl bg-rose-600 px-4 py-2 text-sm text-white hover:bg-rose-700"
             onClick={() => {
-              if (!reason || reason.trim().length < 3) {
-                alert("Lý do phải có tối thiểu 3 ký tự."); // hoặc toast
+              if (!reason || reason.trim().length < minLength) {
+                alert(`Lý do phải có tối thiểu ${minLength} ký tự.`); // bạn có thể đổi sang toast
                 return;
               }
-              onSubmit(reason);
+              onSubmit(reason.trim());
             }}
           >
-            Xác nhận
+            {confirmLabel}
           </button>
         </div>
       </div>
@@ -1489,7 +1636,7 @@ function AdminDoctors({ doctors, onUpdateApproval }) {
 
       {/* LIST */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {!filtered ? (
+        {filtered.length === 0 ? (
           <div>Không có yêu cầu nào của bác sĩ</div>
         ) : (
           filtered.map((d) => (
@@ -1597,8 +1744,410 @@ function AdminDoctors({ doctors, onUpdateApproval }) {
     </div>
   );
 }
+function AdminUsers({ users, onUpdateSwitchDoctor }) {
+  const { loading } = useUserContext();
+  const [q, setQ] = useState("");
+  const [tab, setTab] = useState("pending"); // "pending" | "handled"
+  const [selected, setSelected] = useState(null); // user đang xem chi tiết
+  const [showRejectReasonFor, setShowRejectReasonFor] = useState(null); // userId đang mở popup
 
-function AdminExercises({ exercises, onNew, onEdit, onDelete }) {
+  // ✅ Flatten toàn bộ switchDoctor của từng user thành list request
+  const requests = useMemo(() => {
+    const list = [];
+    (users || []).forEach((u) => {
+      (u.switchDoctor || []).forEach((req) => {
+        list.push({
+          user: u,
+          request: req,
+          status: req.switchDoctorStatus || "pending",
+        });
+      });
+    });
+    return list;
+  }, [users]);
+
+  const filtered = useMemo(() => {
+    const qLower = q.toLowerCase();
+
+    return requests.filter(({ user, request, status }) => {
+      if (tab === "pending" && status !== "pending") return false;
+      if (tab === "handled" && status === "pending") return false;
+
+      const userName = user.accountId?.fullName || "";
+      const currentDocName =
+        request.currentDoctorId?.accountId?.fullName ||
+        request.currentDoctorId?.fullName ||
+        "";
+      const targetDocName =
+        request.switchDoctorId?.accountId?.fullName ||
+        request.switchDoctorId?.fullName ||
+        "";
+
+      const matchQ =
+        userName.toLowerCase().includes(qLower) ||
+        currentDocName.toLowerCase().includes(qLower) ||
+        targetDocName.toLowerCase().includes(qLower);
+
+      return matchQ;
+    });
+  }, [requests, q, tab]);
+
+  return (
+    <div className="space-y-4">
+      {/* Search + Tabs */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <input
+          type="text"
+          placeholder="Tìm theo tên bệnh nhân / bác sĩ..."
+          className="h-10 w-full max-w-xs rounded-xl border px-3 text-sm outline-none focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900/40"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+
+        <div className="inline-flex rounded-xl border bg-zinc-50 p-1 text-xs">
+          <button
+            className={`px-4 py-1.5 rounded-lg transition ${
+              tab === "pending"
+                ? "bg-zinc-900 text-white shadow-sm"
+                : "text-zinc-600 hover:bg-white"
+            }`}
+            onClick={() => setTab("pending")}
+          >
+            Yêu cầu chờ duyệt
+          </button>
+
+          <button
+            className={`px-4 py-1.5 rounded-lg transition ${
+              tab === "handled"
+                ? "bg-zinc-900 text-white shadow-sm"
+                : "text-zinc-600 hover:bg-white"
+            }`}
+            onClick={() => setTab("handled")}
+          >
+            Yêu cầu đã xử lý
+          </button>
+        </div>
+      </div>
+
+      {/* LIST */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {filtered.length === 0 ? (
+          <div className="col-span-full rounded-2xl border border-dashed bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+            Hiện chưa có yêu cầu đổi bác sĩ nào.
+          </div>
+        ) : (
+          filtered.map(({ user: u, request, status }) => {
+            const userName = u.accountId?.fullName || "Không rõ tên";
+
+            const currentDocName =
+              request.currentDoctorId?.accountId?.fullName ||
+              request.currentDoctorId?.fullName ||
+              "Chưa có bác sĩ hiện tại";
+            const targetDocName =
+              request.switchDoctorId?.accountId?.fullName ||
+              request.switchDoctorId?.fullName ||
+              "Không rõ bác sĩ xin đổi";
+
+            const reason = request.reason || "Không có lý do cụ thể";
+
+            const tone =
+              status === "accept"
+                ? "success"
+                : status === "pending"
+                ? "warn"
+                : "danger";
+
+            const toneLabel =
+              status === "accept"
+                ? "Đã chấp nhận"
+                : status === "pending"
+                ? "Đang chờ duyệt"
+                : "Đã từ chối";
+
+            return (
+              <div
+                key={request._id || `${u._id}-${Math.random()}`}
+                className="group relative overflow-hidden rounded-2xl border bg-white/80 p-4 shadow-sm transition hover:border-zinc-200 hover:shadow-md"
+              >
+                {/* Status badge góc phải */}
+                <div className="absolute right-3 top-3">
+                  <Badge tone={tone}>{toneLabel}</Badge>
+                </div>
+
+                {/* Header: bệnh nhân */}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-100 to-sky-100 text-sm font-semibold text-emerald-800">
+                    {userName.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-zinc-900">
+                      {userName}
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      Yêu cầu đổi bác sĩ
+                    </div>
+                  </div>
+                </div>
+
+                {/* Body: bác sĩ từ → sang */}
+                <div className="mt-3 rounded-xl bg-zinc-50/80 p-3 text-xs text-zinc-600">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="text-[11px] uppercase tracking-wide text-zinc-400">
+                        Bác sĩ hiện tại
+                      </div>
+                      <div className="font-medium text-zinc-800">
+                        {currentDocName}
+                      </div>
+                    </div>
+
+                    <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-white shadow-sm">
+                      <ArrowRight className="h-4 w-4 text-zinc-500" />
+                    </div>
+
+                    <div className="flex-1 text-right">
+                      <div className="text-[11px] uppercase tracking-wide text-zinc-400">
+                        Bác sĩ xin đổi sang
+                      </div>
+                      <div className="font-medium text-emerald-700">
+                        {targetDocName}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lý do */}
+                <div className="mt-2 line-clamp-2 text-xs text-zinc-500">
+                  <span className="font-semibold text-zinc-600">Lý do: </span>
+                  {reason}
+                </div>
+
+                {/* Actions */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {tab === "pending" && status === "pending" && (
+                    <>
+                      <IconBtn
+                        icon={Check}
+                        disabled={loading}
+                        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={() =>
+                          onUpdateSwitchDoctor({
+                            userId: u._id,
+                            status: "accept",
+                            reason: "",
+                            fee: request.switchDoctorId?.pricePerWeek,
+                            // nếu backend cần phân biệt request nào:
+                            // requestId: request._id,
+                          })
+                        }
+                      >
+                        {loading ? "Đang xử lý..." : "Chấp nhận đổi"}
+                      </IconBtn>
+
+                      <IconBtn
+                        icon={XIcon}
+                        className="border-rose-200 text-rose-600 hover:bg-rose-50"
+                        onClick={() => setShowRejectReasonFor(u._id)}
+                      >
+                        Từ chối
+                      </IconBtn>
+                    </>
+                  )}
+
+                  <IconBtn
+                    icon={Info}
+                    className="border-yellow-200 text-yellow-800 hover:bg-yellow-50"
+                    onClick={() => setSelected(u)} // vẫn truyền cả user để modal chi tiết xử lý
+                  >
+                    Chi tiết
+                  </IconBtn>
+                </div>
+
+                {/* Modal lý do từ chối cho từng user */}
+                <RejectReasonModal
+                  open={showRejectReasonFor === u._id}
+                  onClose={() => setShowRejectReasonFor(null)}
+                  title="Từ chối yêu cầu đổi bác sĩ"
+                  description={`Bạn có chắc muốn từ chối yêu cầu đổi bác sĩ của bệnh nhân "${
+                    u.accountId?.fullName || ""
+                  }"? Hãy nhập lý do:`}
+                  placeholder="Nhập lý do từ chối yêu cầu đổi bác sĩ..."
+                  confirmLabel="Từ chối yêu cầu"
+                  onSubmit={(reasonText) => {
+                    onUpdateSwitchDoctor({
+                      userId: u._id,
+                      status: "rejected",
+                      reason: reasonText,
+                      // requestId: request._id, nếu cần
+                    });
+                    setShowRejectReasonFor(null);
+                  }}
+                />
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* MODAL CHI TIẾT: 2 bác sĩ + mũi tên ở giữa */}
+      <SwitchDoctorDetailModal
+        request={selected}
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        tab={tab}
+        loading={loading}
+        setShowRejectReasonFor={setShowRejectReasonFor}
+      />
+    </div>
+  );
+}
+
+/* ============ Modal chi tiết ============ */
+
+function SwitchDoctorDetailModal({ request, open, onClose }) {
+  if (!open || !request) return null;
+
+  const userName = request.accountId?.fullName || "Không rõ tên";
+  const status = request.switchDoctor?.at(-1).switchDoctorStatus || "pending";
+  const reason = request.switchDoctor?.at(-1).reason || "Không có lý do cụ thể";
+
+  const currentDoctor =
+    request.switchDoctor?.at(-1).currentDoctorId ||
+    request.switchDoctor?.at(-1).doctorId ||
+    null; // tuỳ schema
+  const targetDoctor = request.switchDoctor?.at(-1).switchDoctorId || null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6">
+      <div className="w-full max-w-4xl rounded-2xl bg-white p-5 shadow-xl md:p-7">
+        {/* Header */}
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-zinc-900">
+              Chi tiết yêu cầu đổi bác sĩ
+            </div>
+            <div className="text-xs text-zinc-500">
+              Bệnh nhân: <span className="font-medium">{userName}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+          >
+            <XCircle className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Main content: 2 card bác sĩ + mũi tên ở giữa */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-4 md:gap-6">
+          {/* Bác sĩ hiện tại */}
+          <DoctorMiniCard doctor={currentDoctor} label="Bác sĩ hiện tại" />
+
+          {/* Arrow */}
+          <div className="flex flex-col items-center justify-center text-zinc-400">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100">
+              <ArrowRight className="h-5 w-5" />
+            </div>
+            <div className="mt-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+              Đổi sang
+            </div>
+          </div>
+
+          {/* Bác sĩ xin đổi sang */}
+          <DoctorMiniCard
+            doctor={targetDoctor}
+            label="Bác sĩ xin đổi sang"
+            highlight
+          />
+        </div>
+
+        {/* Lý do + trạng thái */}
+        <div className="mt-4 rounded-xl bg-zinc-50 p-3 text-xs text-zinc-600">
+          <div className="mb-1 font-semibold text-zinc-700">Lý do đổi:</div>
+          <div className="text-xs leading-relaxed">{reason}</div>
+          <div className="mt-3 flex items-center justify-between">
+            <div className="text-[12px] text-zinc-500">
+              Trạng thái hiện tại:{" "}
+              <span className="font-semibold text-zinc-700">
+                {status === "approved"
+                  ? "Đã chấp nhận"
+                  : status === "pending"
+                  ? "Đang chờ duyệt"
+                  : "Đã từ chối"}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============ Mini card hiển thị bác sĩ ============ */
+
+function DoctorMiniCard({ doctor, label, highlight = false }) {
+  if (!doctor) {
+    return (
+      <div className="flex flex-col justify-between rounded-2xl border bg-white p-4 text-xs text-zinc-500">
+        <div className="text-[11px] uppercase tracking-wide text-zinc-400">
+          {label}
+        </div>
+        <div className="mt-2 text-sm text-zinc-500">
+          Không có thông tin bác sĩ
+        </div>
+      </div>
+    );
+  }
+
+  const name = doctor.accountId?.fullName || doctor.fullName || "Không rõ tên";
+  const role = doctor.role || doctor.accountId?.role || "doctor";
+  const years = doctor.yearsExperience || 0;
+  const price = doctor.pricePerWeek
+    ? currencyVND(doctor.pricePerWeek)
+    : "Chưa thiết lập";
+  const specs = (doctor.specializations || []).join(", ");
+  const mods = (doctor.modalities || []).join(", ");
+
+  return (
+    <div
+      className={`flex flex-col justify-between rounded-2xl border bg-white p-4 text-xs shadow-sm ${
+        highlight ? "border-emerald-200 bg-emerald-50/40" : ""
+      }`}
+    >
+      <div>
+        <div className="text-[11px] uppercase tracking-wide text-zinc-400">
+          {label}
+        </div>
+        <div className="mt-1 text-sm font-semibold text-zinc-900">{name}</div>
+        <div className="mt-0.5 text-[11px] text-zinc-500 capitalize">
+          {role} • {years} năm kinh nghiệm
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-1.5 text-[11px] text-zinc-600">
+        {specs && (
+          <div>
+            <span className="font-semibold text-zinc-700">Chuyên môn: </span>
+            {specs}
+          </div>
+        )}
+        {mods && (
+          <div>
+            <span className="font-semibold text-zinc-700">Phương pháp: </span>
+            {mods}
+          </div>
+        )}
+        <div>
+          <span className="font-semibold text-zinc-700">Giá / tuần: </span>
+          {price}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminExercises({ exercises, onNew, onEdit }) {
   const [q, setQ] = useState("");
   const filtered = useMemo(
     () =>
@@ -1666,7 +2215,7 @@ function AdminExercises({ exercises, onNew, onEdit, onDelete }) {
                     <IconBtn
                       icon={Trash2}
                       className="text-rose-600"
-                      onClick={() => onDelete(e._id)}
+                      onClick={() => alert("demo")}
                     >
                       Xóa
                     </IconBtn>
@@ -1710,23 +2259,71 @@ function Bars({ labels, values }) {
   );
 }
 
-function NotificationsView({ notifications }) {
+function NotificationsView({
+  notifications = [],
+  onMarkRead, // optional: async (id) => patch read=true
+}) {
   return (
     <div className="rounded-2xl border bg-white p-4">
-      <div className="mb-3 text-sm font-semibold">Thông báo</div>
-      <div className="space-y-2">
-        {(notifications || []).map((n) => (
-          <div
-            key={n.id}
-            className="flex items-center justify-between rounded-xl border p-3"
-          >
-            <div className="min-w-0">
-              <div className="truncate text-sm">{n.text}</div>
-              <div className="text-xs text-zinc-500">{fmtDateTime(n.at)}</div>
-            </div>
-            <Badge tone="info">{n.type}</Badge>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-sm font-semibold">Thông báo</div>
+        <div className="flex justify-center gap-4 items-center">
+          {notifications.filter((e) => !e.read).length > 0 && (
+            <button
+              onClick={onMarkRead}
+              className="text-sm border rounded px-2 py-1 hover:bg-gray-400 bg-gray-300 cursor-pointer"
+            >
+              Đánh dấu tất cả là đã đọc
+            </button>
+          )}
+          <div className="text-xs text-zinc-500">
+            Tổng: <span className="font-semibold">{notifications.length}</span>
           </div>
-        ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {(notifications || []).map((n) => {
+          const isUnread = !n.read;
+          const time = n.createdAt || n.updatedAt;
+
+          return (
+            <div
+              key={n._id}
+              className={`flex items-start justify-between gap-3 rounded-xl border p-3 transition ${
+                isUnread
+                  ? "border-zinc-300 bg-zinc-50"
+                  : "border-zinc-200 bg-white"
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  {isUnread && (
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  )}
+                  <div className="truncate text-sm font-semibold">
+                    {n.title}
+                  </div>
+                </div>
+
+                <div className="mt-1 line-clamp-2 text-sm text-zinc-700">
+                  {n.message}
+                </div>
+
+                <div className="mt-1 text-xs text-zinc-500">
+                  {time ? fmtDateTime(time) : "—"}
+                </div>
+              </div>
+
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <Badge tone={n.type === "payment" ? "success" : "info"}>
+                  {n.type}
+                </Badge>
+              </div>
+            </div>
+          );
+        })}
+
         {(!notifications || notifications.length === 0) && (
           <div className="text-xs text-zinc-500">Không có thông báo.</div>
         )}

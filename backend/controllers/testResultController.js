@@ -1,5 +1,12 @@
 import TestResult from "../models/testResult.model.js";
 
+const getBand = (score) => {
+  if (score <= 4) return "Bình thường";
+  if (score <= 9) return "Nhẹ";
+  if (score <= 14) return "Trung bình";
+  return "Nặng";
+};
+
 const getTestResults = async (req, res) => {
   try {
     const testResults = await TestResult.find();
@@ -22,13 +29,13 @@ const getTestResultByCode = async (req, res) => {
 
 const createTestResult = async (req, res) => {
   try {
-    const { code, answers, totalScore, band } = req.body;
+    const { code, answers, totalScore, band = "" } = req.body;
     const testResult = await TestResult.create({
       userId: req.user._id,
       code,
       answers,
       totalScore,
-      band,
+      band: getBand(totalScore),
     });
     res
       .status(201)

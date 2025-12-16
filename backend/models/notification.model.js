@@ -2,33 +2,38 @@ import mongoose from "mongoose";
 // Notification: nhắc test, nhắc bài tập, nhắc lịch
 const notificationSchema = new mongoose.Schema(
   {
-    accountId: { type: ObjectId, ref: "Account", index: true },
+    // Ai sẽ nhận thông báo
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false, // vì admin notifications không cần userId
+    },
+    doctorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Doctor",
+      required: false,
+    },
+    admin: { type: Boolean, default: false },
+    // Nội dung thông báo
+    title: { type: String, required: true },
+    message: { type: String, required: true },
+    // Loại thông báo
     type: {
       type: String,
       enum: [
-        "reminder_test",
-        "reminder_homework",
-        "appointment_upcoming",
-        "system",
+        "payment", // thanh toán, upgrade
+        "system", // thông báo hệ thống chung
+        "homework", // thông báo BTVN
+        "call", // thông báo BTVN
       ],
+      default: "system",
     },
-    payload: mongoose.Schema.Types.Mixed, // { testCode, assignmentId, appointmentId, ... }
-    channels: [
-      {
-        type: String,
-        enum: ["inapp", "email", "sms", "push"],
-        default: "inapp",
-      },
-    ],
-    scheduledAt: Date,
-    sentAt: Date,
-    status: {
-      type: String,
-      enum: ["scheduled", "sent", "failed", "canceled"],
-      default: "scheduled",
-    },
+    // Trạng thái đọc
+    read: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
-
+notificationSchema.index({ userId: 1, createdAt: -1 });
+notificationSchema.index({ doctorId: 1, createdAt: -1 });
+notificationSchema.index({ admin: 1, createdAt: -1 });
 export default mongoose.model("Notification", notificationSchema);

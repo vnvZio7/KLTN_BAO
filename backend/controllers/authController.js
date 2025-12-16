@@ -32,7 +32,7 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Thiếu trường bắt buộc" });
     }
 
-    const existed = await Account.findOne({ email });
+    const existed = await Account.findOne({ email: email.trim() });
     if (existed) return res.status(400).json({ message: "Email đã tồn tại" });
 
     // 1) Tạo account
@@ -48,7 +48,7 @@ const registerUser = async (req, res) => {
 
     // 2) Tạo hồ sơ theo role
     if (role === "user") {
-      await User.create({ accountId: account._id });
+      await User.create({ accountId: account._id, testHistory: [] });
     } else if (role === "doctor") {
       const {
         role: dRole,

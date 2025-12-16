@@ -4,7 +4,9 @@ import { gadBand, phqBand } from "../utils/helper.js";
 const getTests = async (req, res) => {
   try {
     const tests = await Test.find();
-    res.json(tests);
+    const data = tests.map((e) => e);
+    res.json(data);
+    // res.json(tests);
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

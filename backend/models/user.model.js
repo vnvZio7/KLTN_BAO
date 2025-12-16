@@ -14,10 +14,26 @@ const userSchema = new mongoose.Schema(
         ref: "TestResult",
       },
     ],
+    freeCall: { type: Number, default: 1 },
+    firstCallInWeek: { type: Boolean, default: true },
+    retest: { type: Boolean, default: false },
+    lastGAD7Score: Number,
+    lastPHQ9Score: Number,
     dominantSymptom: String, // Lo âu, Trầm cảm
-    aiNotes: String, // Ghi chú AI (giải thích ngắn)
+    // aiNotes: String, // Ghi chú AI (giải thích ngắn)
     doctorIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Doctor" }],
     currentDoctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
+    switchDoctor: [
+      {
+        currentDoctorId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Doctor",
+        },
+        switchDoctorId: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
+        switchDoctorStatus: { type: String },
+        reason: { type: String },
+      },
+    ],
   },
   { timestamps: true }
 );

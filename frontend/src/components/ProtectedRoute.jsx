@@ -13,8 +13,7 @@ export default function ProtectedRoute({ allow }) {
   if (!authed) return <Navigate to="/login" replace />;
 
   if (allow && !allow.includes(role)) {
-    // Nếu không có quyền, đưa về trang mặc định
-    toast.error("Ban khong co quyen");
+    toast.error("Bạn không có quyền truy cập");
     if (role === "doctor") return <Navigate to="/doctor" replace />;
     if (role === "user") return <Navigate to="/user" replace />;
     if (role === "admin") return <Navigate to="/admin-test" replace />;
@@ -26,29 +25,81 @@ export default function ProtectedRoute({ allow }) {
 
 export function RequireDoctorApproved() {
   const { user, loading } = useUserContext();
+
   if (loading) return <LoadingScreen />;
-  if (user.approval.status !== "approved")
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  const status = user.approval?.status; // approved | pending | frozen | rejected
+
+  // ❄️ Nếu tài khoản bị đóng băng
+  if (status === "frozen") {
+    return <Navigate to="/frozen" replace />;
+  }
+
+  // ❌ Không được duyệt → chuyển về pending
+  if (status !== "approved") {
     return <Navigate to="/pending" replace />;
+  }
+
   return <Outlet />;
 }
 
 export function RequireDoctorPending() {
   const { user, loading } = useUserContext();
+
   if (loading) return <LoadingScreen />;
-  if (user.approval.status !== "pending")
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  const status = user.approval?.status; // approved | pending | frozen | rejected
+
+  // ❄️ Frozen
+  if (status === "frozen") {
+    return <Navigate to="/frozen" replace />;
+  }
+
+  // Nếu đã approved -> không cho vào pending nữa
+  if (status === "approved") {
     return <Navigate to="/doctor" replace />;
-  return <Outlet />;
-}
-export function RequireTestDone() {
-  const { user, loading } = useUserContext();
-  if (loading) return <LoadingScreen />;
-  if (user.testHistory.length === 0) return <Navigate to="/test" replace />;
+  }
+
+  // Nếu bị rejected hoặc trạng thái linh tinh -> đưa về /doctor
+  if (status !== "pending") {
+    return <Navigate to="/doctor" replace />;
+  }
+
+  // 🟡 Đúng trạng thái pending -> cho render
   return <Outlet />;
 }
 
+/* ===== Đã làm test ===== */
+export function RequireTestDone() {
+  const { user, loading } = useUserContext();
+
+  if (loading) return <LoadingScreen />;
+  console.log(user.testHistory?.length);
+  if (!user) return <Navigate to="/login" replace />;
+  console.log(user);
+
+  if (user.testHistory?.length === 0) {
+    return <Navigate to="/test" replace />;
+  }
+
+  return <Outlet />;
+}
+
+/* ===== Chưa làm test ===== */
 export function RequireNoTest() {
   const { user, loading } = useUserContext();
+
   if (loading) return <LoadingScreen />;
-  if (user.testHistory.length > 0) return <Navigate to="/user" replace />;
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (user.testHistory?.length > 0) {
+    return <Navigate to="/user" replace />;
+  }
+
   return <Outlet />;
 }

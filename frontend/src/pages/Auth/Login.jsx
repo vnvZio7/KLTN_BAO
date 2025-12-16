@@ -11,10 +11,9 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const { setToken } = useUserContext();
-
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -36,8 +35,10 @@ export default function Login() {
       const data = res.data;
       // 🔹 Lưu token
 
-      if (data.token) localStorage.setItem("accessToken", data.token);
-      setToken(data.token);
+      if (data.token) {
+        localStorage.setItem("accessToken", data.token);
+        setToken(data.token);
+      }
       if (data.account)
         localStorage.setItem("account", JSON.stringify(data.account));
       const role = data.account.role || "";

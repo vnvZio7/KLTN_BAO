@@ -6,6 +6,7 @@ import {
   getMessageByRoomId,
   getMessages,
   sendMessage,
+  readMessageByRoomId,
 } from "../controllers/messageController.js";
 
 const router = express.Router();
@@ -13,4 +14,5 @@ const router = express.Router();
 router.get("/", protect, getMessages);
 router.get("/:roomId", getMessageByRoomId);
 router.post("/", protect, sendMessage);
+router.patch("/:roomId", protect, readMessageByRoomId);
 export default router;
