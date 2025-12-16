@@ -2083,7 +2083,7 @@ function MessagesView({
   onlineUsers,
 }) {
   const [activePatientId, setActivePatientId] = useState(
-    activeId || patients[0]._id
+    activeId || patients[0]?._id || null
   );
   const {
     messages,
@@ -2095,7 +2095,8 @@ function MessagesView({
   } = useUserContext();
   const [text, setText] = useState("");
   const [room, setRoom] = useState([]);
-  const ap = patients.find((p) => p._id === activePatientId) || patients[0];
+  const ap =
+    patients.find((p) => p._id === activePatientId) || patients[0] || null;
   const msgs = messages || [];
   const listRef = useRef(null);
   // Mark read khi mở hội thoại
@@ -2198,171 +2199,180 @@ function MessagesView({
     onRespondComplete?.({ patientId: ap.id, decision });
   };
 
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      {/* Sidebar: danh sách cuộc hội thoại */}
-      <div>
-        <div className="mb-2 text-sm font-semibold">Cuộc hội thoại</div>
-        <div className="space-y-2">
-          {patients.map((p) => (
-            <button
-              key={p._id}
-              onClick={() => setActivePatientId(p._id)}
-              className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left hover:bg-zinc-50 ${
-                ap?._id === p._id ? "border-zinc-900" : "border-zinc-200"
-              }`}
-            >
-              <div className="relative">
-                <Avatar name={p.accountId.fullName} />
-                {onlineUsers.onlineUsers.includes(p._id) && (
-                  <span className="absolute bottom-0.5 size-2 rounded-full ring-2 ring-zinc-900 bg-green-500 right-0.5"></span>
-                )}
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium">
-                  {p.accountId.fullName}
+  return patients.length > 0 ? (
+    <>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {/* Sidebar: danh sách cuộc hội thoại */}
+        <div>
+          <div className="mb-2 text-sm font-semibold">Cuộc hội thoại</div>
+          <div className="space-y-2">
+            {patients.map((p) => (
+              <button
+                key={p._id}
+                onClick={() => setActivePatientId(p._id)}
+                className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left hover:bg-zinc-50 ${
+                  ap?._id === p._id ? "border-zinc-900" : "border-zinc-200"
+                }`}
+              >
+                <div className="relative">
+                  <Avatar name={p.accountId.fullName} />
+                  {onlineUsers.onlineUsers.includes(p._id) && (
+                    <span className="absolute bottom-0.5 size-2 rounded-full ring-2 ring-zinc-900 bg-green-500 right-0.5"></span>
+                  )}
                 </div>
-                <div className="truncate text-xs text-zinc-500">
-                  {rooms.find((r) => r.userId === p._id).lastMessage || "—"}
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">
+                    {p.accountId.fullName}
+                  </div>
+                  <div className="truncate text-xs text-zinc-500">
+                    {rooms.find((r) => r.userId === p._id).lastMessage || "—"}
+                  </div>
                 </div>
-              </div>
-              {p.unread > 0 && <Badge tone="info">{p.unread}</Badge>}
-            </button>
-          ))}
+                {p.unread > 0 && <Badge tone="info">{p.unread}</Badge>}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Khung chat */}
-      <div className="lg:col-span-2 rounded-2xl border bg-white">
-        {/* Header */}
-        <div className="flex items-center gap-3 border-b p-4">
-          <Avatar name={ap.accountId.fullName} />
-          <div className="text-sm font-semibold">{ap.accountId.fullName}</div>
-          {isCompleted ? (
-            <Badge tone="default">Đã hoàn thành</Badge>
-          ) : onlineUsers.onlineUsers.includes(ap._id) ? (
-            <Badge tone="success">Online</Badge>
-          ) : (
-            <Badge tone="danger">Offline</Badge>
+        {/* Khung chat */}
+        <div className="lg:col-span-2 rounded-2xl border bg-white">
+          {/* Header */}
+          <div className="flex items-center gap-3 border-b p-4">
+            <Avatar name={ap.accountId.fullName} />
+            <div className="text-sm font-semibold">{ap.accountId.fullName}</div>
+            {isCompleted ? (
+              <Badge tone="default">Đã hoàn thành</Badge>
+            ) : onlineUsers.onlineUsers.includes(ap._id) ? (
+              <Badge tone="success">Online</Badge>
+            ) : (
+              <Badge tone="danger">Offline</Badge>
+            )}
+
+            <div className="ml-auto flex items-center gap-2">
+              {/* Nút HOÀN THÀNH thay cho gọi video; ẩn nếu đã hoàn thành */}
+              {!isCompleted && (
+                <IconBtn
+                  icon={CheckCircle2}
+                  onClick={handleDoctorComplete}
+                  className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800!"
+                >
+                  Hoàn thành
+                </IconBtn>
+              )}
+            </div>
+          </div>
+
+          {/* Banner xử lý yêu cầu hoàn thành từ User */}
+          {pendingUserRequest && !isCompleted && (
+            <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 flex items-start gap-2">
+              <AlertTriangle className="mt-[2px] h-4 w-4" />
+              <div className="flex-1">
+                Người dùng đã gửi <b>yêu cầu hoàn thành</b> phiên trò chuyện
+                này.
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => respondUserComplete("reject")}
+                  className="rounded-lg border border-amber-300 px-3 py-1.5 text-amber-800 hover:bg-amber-100 text-xs inline-flex items-center gap-1"
+                >
+                  <ThumbsDown className="h-3.5 w-3.5" />
+                  Từ chối
+                </button>
+                <button
+                  onClick={() => respondUserComplete("accept")}
+                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-white hover:bg-emerald-700 text-xs inline-flex items-center gap-1"
+                >
+                  <ThumbsUp className="h-3.5 w-3.5" />
+                  Chấp nhận
+                </button>
+              </div>
+            </div>
           )}
 
-          <div className="ml-auto flex items-center gap-2">
-            {/* Nút HOÀN THÀNH thay cho gọi video; ẩn nếu đã hoàn thành */}
-            {!isCompleted && (
-              <IconBtn
-                icon={CheckCircle2}
-                onClick={handleDoctorComplete}
-                className="border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800!"
-              >
-                Hoàn thành
-              </IconBtn>
-            )}
-          </div>
-        </div>
-
-        {/* Banner xử lý yêu cầu hoàn thành từ User */}
-        {pendingUserRequest && !isCompleted && (
-          <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 flex items-start gap-2">
-            <AlertTriangle className="mt-[2px] h-4 w-4" />
-            <div className="flex-1">
-              Người dùng đã gửi <b>yêu cầu hoàn thành</b> phiên trò chuyện này.
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => respondUserComplete("reject")}
-                className="rounded-lg border border-amber-300 px-3 py-1.5 text-amber-800 hover:bg-amber-100 text-xs inline-flex items-center gap-1"
-              >
-                <ThumbsDown className="h-3.5 w-3.5" />
-                Từ chối
-              </button>
-              <button
-                onClick={() => respondUserComplete("accept")}
-                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-white hover:bg-emerald-700 text-xs inline-flex items-center gap-1"
-              >
-                <ThumbsUp className="h-3.5 w-3.5" />
-                Chấp nhận
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Messages */}
-        <div ref={listRef} className="h-[50vh] overflow-auto p-4">
-          {msgs.length === 0 ? (
-            <Empty icon={MessageSquareText} title="Chưa có tin nhắn" />
-          ) : (
-            <div className="space-y-2">
-              {msgs.map((m) => {
-                if (m.senderType === "system") {
+          {/* Messages */}
+          <div ref={listRef} className="h-[50vh] overflow-auto p-4">
+            {msgs.length === 0 ? (
+              <Empty icon={MessageSquareText} title="Chưa có tin nhắn" />
+            ) : (
+              <div className="space-y-2">
+                {msgs.map((m) => {
+                  if (m.senderType === "system") {
+                    return (
+                      <div
+                        key={m._id}
+                        className="mx-auto max-w-[80%] text-center text-xs text-zinc-600"
+                      >
+                        <div className="inline-block rounded-lg border border-zinc-200 bg-white px-3 py-1.5">
+                          {m.content}
+                        </div>
+                        <div className="mt-1 text-[10px] text-zinc-400">
+                          {prettyTime(m.createdAt)}
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div
                       key={m._id}
-                      className="mx-auto max-w-[80%] text-center text-xs text-zinc-600"
+                      className={`flex ${
+                        m.senderType === "doctor"
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
                     >
-                      <div className="inline-block rounded-lg border border-zinc-200 bg-white px-3 py-1.5">
-                        {m.content}
-                      </div>
-                      <div className="mt-1 text-[10px] text-zinc-400">
-                        {prettyTime(m.createdAt)}
+                      <div
+                        className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
+                          m.senderType === "doctor"
+                            ? "bg-zinc-900 text-white"
+                            : "bg-zinc-100"
+                        }`}
+                      >
+                        <div>{m.content}</div>
+                        <div className="mt-1 text-[10px] opacity-70">
+                          {prettyTime(m.createdAt)}
+                        </div>
                       </div>
                     </div>
                   );
-                }
-                return (
-                  <div
-                    key={m._id}
-                    className={`flex ${
-                      m.senderType === "doctor"
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-                        m.senderType === "doctor"
-                          ? "bg-zinc-900 text-white"
-                          : "bg-zinc-100"
-                      }`}
-                    >
-                      <div>{m.content}</div>
-                      <div className="mt-1 text-[10px] opacity-70">
-                        {prettyTime(m.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                })}
+              </div>
+            )}
+          </div>
 
-        {/* Composer (vẫn cho phép chat nếu chưa completed) */}
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (!ap || !text.trim()) return;
-            await sendMessage({ roomId: room._id, content: text });
+          {/* Composer (vẫn cho phép chat nếu chưa completed) */}
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!ap || !text.trim()) return;
+              await sendMessage({ roomId: room._id, content: text });
 
-            setText("");
-          }}
-          className="flex items-center gap-2 border-t p-3"
-        >
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={isCompleted ? "Phiên đã hoàn thành" : "Nhập tin nhắn…"}
-            className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
-            disabled={isCompleted}
-          />
-          <IconBtn
-            icon={MessageSquareText}
-            className="border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800 disabled:opacity-60"
-            disabled={isCompleted}
+              setText("");
+            }}
+            className="flex items-center gap-2 border-t p-3"
           >
-            Gửi
-          </IconBtn>
-        </form>
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={
+                isCompleted ? "Phiên đã hoàn thành" : "Nhập tin nhắn…"
+              }
+              className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
+              disabled={isCompleted}
+            />
+            <IconBtn
+              icon={MessageSquareText}
+              className="border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800 disabled:opacity-60"
+              disabled={isCompleted}
+            >
+              Gửi
+            </IconBtn>
+          </form>
+        </div>
       </div>
+    </>
+  ) : (
+    <div className="space-y-4">
+      <Empty icon={Users} title="Chưa có bệnh nhân nào" />
     </div>
   );
 }
@@ -2960,7 +2970,7 @@ function HomeworkView({
   assignments, // mảng HomeworkAssignment từ backend
   homeworkSubmissions,
   patients, // mảng bệnh nhân để map userId -> tên
-  activePatientId = patients[0]._id, // id bệnh nhân đang chọn
+  activePatientId = patients[0]?._id, // id bệnh nhân đang chọn
   onAssignOpen,
   onUpdate, // optional: async (id, payload) => ...
   setAssignments,
