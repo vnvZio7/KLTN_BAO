@@ -831,7 +831,7 @@ export default function TestAndMatch() {
               open={open}
               onClose={() => setOpen(false)}
               onConfirmed={handleConfirm}
-              amount={10000}
+              amount={pickedDoctorId.pricePerWeek}
               orderCode={orderCode}
             />
           </>
