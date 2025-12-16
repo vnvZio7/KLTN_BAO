@@ -387,7 +387,7 @@ export default function AdminPortal() {
         );
 
         // Nếu server xóa doctor khi rejected
-        if (res?.data?.id) {
+        if (res?.data?.id && status === "rejected") {
           toast.success(
             res?.data?.message || "Đã từ chối và xoá hồ sơ bác sĩ khỏi hệ thống"
           );
@@ -1637,7 +1637,9 @@ function AdminDoctors({ doctors, onUpdateApproval }) {
       {/* LIST */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
         {filtered.length === 0 ? (
-          <div>Không có yêu cầu nào của bác sĩ</div>
+          <div className="col-span-full rounded-2xl border border-dashed bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
+            Hiện chưa có yêu cầu phê duyệt bác sĩ nào.
+          </div>
         ) : (
           filtered.map((d) => (
             <div key={d._id} className="rounded-2xl border bg-white p-4">
