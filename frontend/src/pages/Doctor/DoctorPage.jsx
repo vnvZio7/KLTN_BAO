@@ -31,6 +31,9 @@ import {
   Clock3,
   Paperclip,
   DollarSign,
+  XIcon,
+  RefreshCcwDotIcon,
+  AlertCircleIcon,
 } from "lucide-react";
 import { useUserContext } from "../../context/userContext";
 import axiosInstance from "../../utils/axiosInstance";
@@ -45,6 +48,9 @@ import {
 import { THERAPY_METHODS } from "../../utils/data";
 import toast from "react-hot-toast";
 import { useRef } from "react";
+import VideoCallPopup from "../../components/VideoCallPopup";
+import { currencyVND } from "../../lib/utils";
+import SessionDetailPopup from "../../components/SessionDetailPopup";
 
 /**
  * Doctor Portal — single file demo for React + Vite + Tailwind
@@ -81,7 +87,7 @@ const withinSameDay = (a, b = new Date()) => {
   );
 };
 
-// PHQ-9 classification (0–27)
+// PHQ-9 classification (0–21)
 function classifyPHQ9(score = 0) {
   if (score <= 4) return { label: "Bình thường", tone: "ok" };
   if (score <= 9) return { label: "Nhẹ", tone: "mild" };
@@ -114,29 +120,6 @@ function toneToClass(tone) {
 }
 
 // --------------------------- Mocked Data -----------------------------
-
-const MOCK_CALL_REQUESTS = [
-  {
-    id: uid(),
-    patientId: "p003",
-    preferred: addDaysISO(1, 15),
-    note: "Follow-up sau bài tập",
-    status: "pending",
-  },
-  {
-    id: uid(),
-    patientId: "p001",
-    preferred: addDaysISO(2, 9),
-    note: "Kiểm tra tiến triển",
-    status: "pending",
-  },
-];
-
-const MOCK_AVAILABILITY = [
-  addDaysISO(1, 10),
-  addDaysISO(2, 11),
-  addDaysISO(3, 9),
-];
 
 function addDaysISO(days = 0, atHour = 9) {
   const d = new Date();
@@ -230,13 +213,21 @@ const Progress = ({ value = 0, max = 100, label }) => (
 export default function DoctorPage() {
   const {
     handleLogout,
+    homeworkSubmissions,
     user,
     patients,
     rooms,
     exercises,
     assignments,
+    appointments,
     sendMessage,
     onlineUsers,
+    setAssignments,
+    setHomeworkSubmissions,
+    sessions,
+    setPatients,
+    notifications,
+    setNotifications,
   } = useUserContext();
 
   const [mode, setMode] = useState("template"); // "template" | "custom"
@@ -250,9 +241,12 @@ export default function DoctorPage() {
   const [customDuration, setCustomDuration] = useState(10);
   const [customMethod, setCustomMethod] = useState(THERAPY_METHODS[0]);
   const [customAttachments, setCustomAttachments] = useState([]);
-  const [customFrequency, setCustomFrequency] = useState("daily");
 
   const [openAssignModal, setOpenAssignModal] = useState(false);
+  const [openCall, setOpenCall] = useState(false);
+  const [callRoomId, setCallRoomId] = useState(null);
+  const [sessionData, setSessionData] = useState([]);
+  const [openCallDetails, setOpenCallDetails] = useState(false);
   const [templatePick, setTemplatePick] = useState(exercises[0].code);
   const [templateDue, setTemplateDue] = useState(addDaysISO(3));
 
@@ -265,30 +259,6 @@ export default function DoctorPage() {
     [patients, activePatientId]
   );
 
-  const [callRequests, setCallRequests] = useState(MOCK_CALL_REQUESTS);
-  const [availability, setAvailability] = useState(MOCK_AVAILABILITY);
-  const [calls, setCalls] = useState(() =>
-    patients
-      .filter((p) => p.nextCall)
-      .map((p) => ({
-        id: uid(),
-        patientId: p._id,
-        time: p.nextCall,
-        duration: 45,
-        status: "scheduled",
-      }))
-  );
-
-  const [notifications, setNotifications] = useState([
-    {
-      id: uid(),
-      type: "info",
-      text: "Đã kết nối tới bệnh nhân Nguyễn Bảo",
-      at: addMinsISO(-15),
-      read: false,
-    },
-  ]);
-
   const [openScheduleModal, setOpenScheduleModal] = useState(false);
   const [scheduleDraft, setScheduleDraft] = useState({
     patientId: null,
@@ -299,11 +269,13 @@ export default function DoctorPage() {
   const stats = useMemo(() => {
     const total = patients.length;
     const activeChats = patients.filter((p) => (p.unread || 0) > 0).length;
-    const upcomingToday = calls.filter((c) => withinSameDay(c.time)).length;
-    const pendingReq = callRequests.filter(
+    const upcomingToday = appointments.filter((c) =>
+      withinSameDay(c.startTime)
+    ).length;
+    const pendingReq = appointments.filter(
       (r) => r.status === "pending"
     ).length;
-    const homeworkDueToday = 0;
+    const homeworkDueToday = currencyVND();
     // patients.reduce(
     //   (acc, p) =>
     //     acc +
@@ -313,7 +285,7 @@ export default function DoctorPage() {
     //   0
     // );
     return { total, activeChats, upcomingToday, pendingReq, homeworkDueToday };
-  }, [patients, calls, callRequests]);
+  }, [patients, appointments]);
 
   // ---------------------- Actions (mocked) ----------------------
   const notify = (text, type = "info") =>
@@ -322,24 +294,25 @@ export default function DoctorPage() {
       ...n,
     ]);
 
-  const scheduleCall = ({ patientId, time }) => {
-    if (!patientId || !time) return;
-    setCalls((c) => [
-      { id: uid(), patientId, time, duration: 45, status: "scheduled" },
-      ...c,
-    ]);
-    // setPatients((ps) =>
-    //   ps.map((p) => (p._id === patientId ? { ...p, nextCall: time } : p))
-    // );
-    notify(
-      `Đã tạo lịch gọi ${fmtDateTime(time)} với ${nameOf(patientId)}`,
-      "success"
-    );
-  };
-
-  const addAvail = (timeISO) => {
-    setAvailability((a) => [...a, timeISO].sort());
-    notify(`Đã thêm khung giờ khả dụng ${fmtDateTime(timeISO)}`, "info");
+  const onCreateCall = async (payload) => {
+    try {
+      const { roomId, startTime, endTime } = payload;
+      const res = await axiosInstance.post(
+        API_PATHS.APPOINTMENTS.CREATE_APPOINTMENT,
+        {
+          roomId,
+          startTime,
+          endTime,
+        }
+      );
+      if (res.data.success) {
+        toast.success(res.data.message);
+      }
+      return true;
+    } catch (error) {
+      toast.error(error.response.data.message);
+    }
+    // notify(`Đã thêm khung giờ khả dụng ${fmtDateTime(startTime)}`, "info");
   };
 
   const assignHomework = ({ patientId, templateCode, due }) => {
@@ -378,7 +351,6 @@ export default function DoctorPage() {
     difficulty,
     duration,
     method,
-    frequency,
     attachments,
     due,
   }) {
@@ -404,12 +376,6 @@ export default function DoctorPage() {
     // Duration MUST be number
     if (typeof duration !== "number" || isNaN(duration) || duration < 1) {
       return "Thời lượng phải là số phút hợp lệ (>= 1).";
-    }
-
-    // Frequency
-    const FREQUENCIES = ["once", "daily", "weekly"];
-    if (!FREQUENCIES.includes(frequency)) {
-      return "Tần suất không hợp lệ.";
     }
 
     // Attachments
@@ -474,6 +440,29 @@ export default function DoctorPage() {
   // ------------------------------ Views ------------------------------
   return (
     <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
+      {openCall ? (
+        <VideoCallPopup
+          key="call-popup" // ép React unmount đúng 1 lần
+          roomId={callRoomId}
+          open={true}
+          onClose={() => {
+            setCallRoomId(null);
+            setOpenCall(false);
+          }}
+          isDoctor={true}
+        />
+      ) : null}
+      {openCallDetails ? (
+        <SessionDetailPopup
+          open={true}
+          onClose={() => {
+            setSessionData([]);
+            setOpenCallDetails(false);
+          }}
+          session={sessionData}
+        />
+      ) : null}
+
       {/* Sidebar */}
       <aside
         className={`sticky top-0 hidden h-screen shrink-0 border-r bg-white md:block ${
@@ -525,10 +514,10 @@ export default function DoctorPage() {
             >
               <Icon className="h-4 w-4" />
               {sidebarOpen && <span>{label}</span>}
-              {key === "requests" &&
-                callRequests.some((r) => r.status === "pending") && (
+              {key === "calendar" &&
+                appointments.some((r) => r.status === "pending") && (
                   <span className="ml-auto text-xs">
-                    {callRequests.filter((r) => r.status === "pending").length}
+                    {appointments.filter((r) => r.status === "pending").length}
                   </span>
                 )}
             </button>
@@ -647,28 +636,22 @@ export default function DoctorPage() {
             stats={stats}
             patients={patients}
             rooms={rooms}
-            calls={calls}
-            callRequests={callRequests}
+            calls={appointments}
             setNav={setNav}
             setActivePatientId={setActivePatientId}
+            setOpenCall={setOpenCall}
+            setCallRoomId={setCallRoomId}
           />
         )}
 
         {nav === "patients" && (
           <PatientsView
             patients={patients}
-            // setPatients={setPatients}
+            setPatients={setPatients}
+            setNav={setNav}
             assignments={assignments}
             activePatientId={activePatientId}
             setActivePatientId={setActivePatientId}
-            onAssign={() => setOpenAssignModal(true)}
-            onSchedule={() => {
-              setScheduleDraft({
-                patientId: activePatientId,
-                time: addDaysISO(0, new Date().getHours() + 2),
-              });
-              setOpenScheduleModal(true);
-            }}
           />
         )}
 
@@ -683,18 +666,26 @@ export default function DoctorPage() {
 
         {nav === "calendar" && (
           <CalendarView
-            calls={calls}
-            availability={availability}
+            calls={appointments}
+            rooms={rooms}
             patients={patients}
-            onAddAvail={addAvail}
+            onCreateCall={onCreateCall}
+            setOpenCall={setOpenCall}
+            setOpenCallDetails={setOpenCallDetails}
+            sessions={sessions}
+            setCallRoomId={setCallRoomId}
+            setSessionData={setSessionData}
           />
         )}
 
         {nav === "homework" && (
           <HomeworkView
             assignments={assignments}
+            homeworkSubmissions={homeworkSubmissions}
             patients={patients}
             activePatientId={activePatientId}
+            setAssignments={setAssignments}
+            setHomeworkSubmissions={setHomeworkSubmissions}
             // setPatients={setPatients}
             onMark={markAssignment}
             onAssignOpen={() => setOpenAssignModal(true)}
@@ -710,13 +701,7 @@ export default function DoctorPage() {
           />
         )}
 
-        {nav === "settings" && (
-          <SettingsView
-            doctor={user}
-            availability={availability}
-            onAddAvail={addAvail}
-          />
-        )}
+        {nav === "settings" && <SettingsView doctor={user} />}
       </main>
 
       {/* Assign Homework Modal */}
@@ -748,7 +733,6 @@ export default function DoctorPage() {
                     title: customTitle.trim(),
                     content: customDesc.trim(),
                     difficulty: reconvertDifficult(customDifficulty),
-                    frequency: customFrequency,
                     dueDate: templateDue,
                     duration: customDuration,
                     method: customMethod,
@@ -757,7 +741,6 @@ export default function DoctorPage() {
                     title: payload.title,
                     content: payload.content,
                     difficulty: payload.difficulty,
-                    frequency: payload.frequency,
                     attachments: customAttachments,
                     due: payload.dueDate,
                     duration: payload.duration,
@@ -768,7 +751,6 @@ export default function DoctorPage() {
                     alert(error);
                     return;
                   }
-                  alert("send");
                   try {
                     // 2. Tạo FormData để gửi cả JSON + file
                     const formData = new FormData();
@@ -791,12 +773,19 @@ export default function DoctorPage() {
                         },
                       }
                     );
+                    const newAssignment =
+                      res.data.homeworkAssignment ||
+                      res.data.data?.homeworkAssignment ||
+                      res.homeworkAssignment;
+                    console.log(newAssignment);
+                    // 🚀 Thêm vào danh sách assignments trong UI
+                    setAssignments((prev) => [...prev, newAssignment]);
                     toast.success("Giao bài tập thành công");
                   } catch (error) {
                     toast.error(error.message);
                   }
                   // assignHomework(payload);
-                  // setOpenAssignModal(false);
+                  setOpenAssignModal(false);
                 }}
               >
                 Xác nhận giao bài
@@ -987,9 +976,7 @@ export default function DoctorPage() {
                   type="datetime-local"
                   className="mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
                   value={toLocalInputValue(templateDue)}
-                  onChange={(e) =>
-                    setTemplateDue(fromLocalInputValue(e.target.value))
-                  }
+                  onChange={(e) => setTemplateDue(e.target.value)}
                 />
               </div>
               <div>
@@ -1058,7 +1045,7 @@ export default function DoctorPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {/* Độ khó */}
                 <div>
                   <label className="block text-sm font-medium">Độ khó</label>
@@ -1104,20 +1091,6 @@ export default function DoctorPage() {
                     ))}
                   </select>
                 </div>
-
-                {/* 👉 NEW: Tần suất làm bài */}
-                <div>
-                  <label className="block text-sm font-medium">Tần suất</label>
-                  <select
-                    className="mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
-                    value={customFrequency}
-                    onChange={(e) => setCustomFrequency(e.target.value)}
-                  >
-                    <option value="once">Làm 1 lần</option>
-                    <option value="daily">Hàng ngày</option>
-                    <option value="weekly">Hàng tuần</option>
-                  </select>
-                </div>
               </div>
             </div>
           )}
@@ -1144,7 +1117,7 @@ export default function DoctorPage() {
               onClick={() => {
                 scheduleCall({
                   patientId: scheduleDraft.patientId || activePatientId,
-                  time: scheduleDraft.time,
+                  time: scheduleDraft.startTime,
                 });
                 setOpenScheduleModal(false);
               }}
@@ -1176,7 +1149,7 @@ export default function DoctorPage() {
             <input
               type="datetime-local"
               className="mt-1 h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
-              value={toLocalInputValue(scheduleDraft.time)}
+              value={toLocalInputValue(scheduleDraft.startTime)}
               onChange={(e) =>
                 setScheduleDraft((s) => ({
                   ...s,
@@ -1186,7 +1159,7 @@ export default function DoctorPage() {
             />
             <div className="mt-2 text-xs text-zinc-500">Gợi ý khả dụng:</div>
             <div className="mt-2 flex flex-wrap gap-2">
-              {availability.slice(0, 6).map((a) => (
+              {/* {availability.slice(0, 6).map((a) => (
                 <button
                   key={a}
                   className="rounded-lg border border-zinc-200 px-2.5 py-1 text-xs hover:bg-zinc-50"
@@ -1194,7 +1167,7 @@ export default function DoctorPage() {
                 >
                   {fmtDateTime(a)}
                 </button>
-              ))}
+              ))} */}
             </div>
           </div>
         </div>
@@ -1234,18 +1207,48 @@ function Dashboard({
   patients,
   rooms,
   calls,
-  callRequests,
   setNav,
   setActivePatientId,
+  setOpenCall,
+  setCallRoomId,
 }) {
-  const upcoming = useMemo(
-    () =>
-      calls
-        .slice()
-        .sort((a, b) => +new Date(a.time) - +new Date(b.time))
-        .slice(0, 6),
-    [calls]
-  );
+  const upcoming = useMemo(() => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = now.getMonth();
+    const dd = now.getDate();
+
+    const startOfDay = new Date(yyyy, mm, dd, 0, 0, 0);
+    const endOfDay = new Date(yyyy, mm, dd, 23, 59, 59, 999);
+    const oneHourMs = 60 * 60 * 1000;
+    const oneHourAgo = new Date(now.getTime() - oneHourMs);
+
+    return calls
+      .filter((call) => {
+        const t = new Date(call.startTime);
+        // chỉ lấy cuộc gọi trong ngày hôm nay
+        return t >= startOfDay && t <= endOfDay;
+      })
+      .sort((a, b) => {
+        const ta = new Date(a.startTime);
+        const tb = new Date(b.startTime);
+
+        // Xác định group cho từng cuộc gọi
+        const groupOf = (t) => {
+          if (t >= oneHourAgo && t <= now) return 0; // từ 1h trước -> hiện tại
+          if (t > now && t <= endOfDay) return 1; // từ hiện tại -> hết ngày
+          return 2; // trước 1h trước (đầu ngày tới < oneHourAgo)
+        };
+
+        const ga = groupOf(ta);
+        const gb = groupOf(tb);
+
+        if (ga !== gb) return ga - gb; // group nhỏ hơn đứng trước
+        return ta - tb; // cùng group thì sort theo thời gian
+      })
+      .slice(0, 6);
+  }, [calls]);
+
   const recentMsgs = useMemo(() => {
     if (!patients?.length || !rooms?.length) return [];
 
@@ -1284,7 +1287,7 @@ function Dashboard({
   return (
     <div className="space-y-5">
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           icon={Users}
           label="Bệnh nhân"
@@ -1309,12 +1312,6 @@ function Dashboard({
           value={stats.homeworkDueToday}
           hint={"Tháng " + new Date().getMonth()}
         />
-        <StatCard
-          icon={DollarSign}
-          label="Tổng doanh thu"
-          value={stats.pendingReq}
-          hint="Chưa xử lý"
-        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -1334,25 +1331,97 @@ function Dashboard({
                 hint="Tạo lịch mới ở mục Lịch gọi"
               />
             )}
-            {upcoming.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center gap-3 rounded-xl border p-3"
-              >
-                <Avatar name={c.patientId} patients={patients} />
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">
-                    {nameOf(patients, c.patientId)}
+            {upcoming.map((c) => {
+              const now = new Date();
+              const nowMs = now.getTime();
+              const fifteenMs = 15 * 60 * 1000;
+
+              const start = new Date(c.startTime);
+              const end = new Date(c.endTime);
+              const startMs = start.getTime();
+              const endMs = end.getTime();
+
+              const status = c.status;
+              const isCompleted =
+                status === "completed" || status === "complete";
+              const isPast = nowMs > endMs;
+              const isSoon = nowMs < startMs - fifteenMs; // giống CalendarCell
+
+              let canJoin = false;
+              let btnLabel = "";
+
+              // 🔹 Logic giống CalendarCell
+              if (isSoon) {
+                btnLabel = "Sắp diễn ra";
+                canJoin = false;
+              } else if (nowMs >= startMs - fifteenMs && nowMs <= endMs) {
+                btnLabel = "Vào phòng";
+                canJoin = true;
+              } else if (isCompleted) {
+                btnLabel = "Xem chi tiết";
+                canJoin = true;
+              } else {
+                btnLabel = "Đã quá giờ";
+                canJoin = false;
+              }
+
+              // 🔹 Tone màu card giống CalendarCell
+              let cardTone = "border-sky-100 bg-sky-50"; // mặc định: chưa tới 15 phút
+              if (canJoin && nowMs <= endMs) {
+                cardTone = "border-emerald-200 bg-emerald-50";
+              } else if (isCompleted) {
+                cardTone = "border-zinc-200 bg-zinc-50";
+              } else if (isPast && !isCompleted) {
+                cardTone = "border-rose-200 bg-rose-50";
+              }
+
+              return (
+                <div
+                  key={c._id}
+                  className={`flex items-center gap-3 rounded-xl border p-3 ${cardTone}`}
+                >
+                  <Avatar
+                    name={c.roomId?.userId?.accountId?.fullName}
+                    patients={patients}
+                  />
+
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">
+                      {nameOf(patients, c.roomId?.userId?._id)}
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      {fmtDateTime(c.startTime)} • 45 phút
+                    </div>
                   </div>
-                  <div className="text-xs text-zinc-500">
-                    {fmtDateTime(c.time)} • 45 phút
+
+                  <div className="ml-auto flex items-center gap-2">
+                    <IconBtn
+                      icon={Video}
+                      className={`border text-[11px] px-3 py-1.5 
+            ${
+              canJoin
+                ? "border-emerald-400 text-emerald-700 hover:bg-emerald-100"
+                : isCompleted
+                ? "border-zinc-300 text-zinc-700 hover:bg-zinc-100"
+                : isPast
+                ? "border-rose-300 text-rose-700 cursor-not-allowed"
+                : "border-sky-300 text-sky-700 cursor-not-allowed"
+            }
+          `}
+                      disabled={!canJoin && !isCompleted}
+                      onClick={() => {
+                        if (!canJoin) return;
+                        console.log(c);
+                        setOpenCall(true);
+                        setCallRoomId(c._id);
+                      }}
+                    >
+                      {btnLabel}
+                    </IconBtn>
                   </div>
                 </div>
-                <div className="ml-auto flex items-center gap-2">
-                  <IconBtn icon={Video}>Bắt đầu</IconBtn>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -1500,12 +1569,10 @@ function StatCard({ icon: Icon, label, value, hint }) {
 // ---------------------------- Patients -------------------------------
 function PatientsView({
   patients = [],
-  // setPatients,
   assignments = [],
+  setNav,
   activePatientId = patients[0]?._id || null,
-  setActivePatientId,
-  onAssign,
-  onSchedule,
+  setPatients,
 }) {
   const ap = useMemo(
     () =>
@@ -1517,22 +1584,7 @@ function PatientsView({
     () => assignments.filter((p) => p.userId === activePatientId),
     [assignments, activePatientId]
   );
-  console.log(assignments);
-  console.log(activePatientId);
-  console.log(ass);
   // Dropdown chọn bệnh nhân (phải ngoài cùng) + tìm kiếm bên trong
-  const [openPatientMenu, setOpenPatientMenu] = useState(false);
-  const [patientQuery, setPatientQuery] = useState("");
-
-  const patientFiltered = useMemo(() => {
-    const q = patientQuery.trim().toLowerCase();
-    if (!q) return patients;
-    return patients.filter(
-      (p) =>
-        p.accountId.fullName.toLowerCase().includes(q) ||
-        (p.tags || []).some((t) => (t || "").toLowerCase().includes(q))
-    );
-  }, [patientQuery, patients]);
 
   // --- Modal trạng thái cho phần Bài tập ---
   const [viewA, setViewA] = useState(null); // xem chi tiết bài đã nộp
@@ -1575,7 +1627,7 @@ function PatientsView({
               <div>
                 <Progress
                   value={ap.testHistory.at(-2).totalScore ?? 0}
-                  max={27}
+                  max={21}
                   label="PHQ-9"
                 />
                 <div
@@ -1609,16 +1661,54 @@ function PatientsView({
               <h3 className="text-sm font-semibold">Bài tập trị liệu</h3>
 
               <div className="gap-2 flex">
-                <IconBtn icon={NotebookPen} onClick={onAssign}>
+                {ap.retest === false && (
+                  <IconBtn
+                    icon={RefreshCcwDotIcon}
+                    onClick={async () => {
+                      const ok = window.confirm(
+                        "Bạn có chắc chắn muốn yêu cầu bệnh nhân này làm lại bài test không?"
+                      );
+
+                      if (!ok) return;
+                      try {
+                        const res = await axiosInstance.patch(
+                          API_PATHS.USERS.UPDATE_RETEST(activePatientId)
+                        );
+                        console.log(res.data);
+                        toast.success(res.data.message);
+                        setPatients((prev) =>
+                          prev.map((p) =>
+                            p._id === activePatientId
+                              ? {
+                                  ...p,
+                                  retest: true, // đánh dấu cần làm lại test
+                                }
+                              : p
+                          )
+                        );
+                      } catch (e) {
+                        toast.error(e.response.data.message);
+                      }
+                    }}
+                  >
+                    Yêu cầu làm bài test
+                  </IconBtn>
+                )}
+                <IconBtn
+                  icon={NotebookPen}
+                  onClick={() => {
+                    setNav("homework");
+                  }}
+                >
                   Giao bài tập
                 </IconBtn>
-                <IconBtn icon={PhoneCall} onClick={onSchedule}>
+                <IconBtn icon={PhoneCall} onClick={() => setNav("calendar")}>
                   Lên lịch gọi
                 </IconBtn>
               </div>
             </div>
 
-            <div className="space-y-2 max-h-[330px] overflow-y-auto">
+            <div className="space-y-2 max-h-80 overflow-y-auto">
               {(ass || []).length === 0 ? (
                 <Empty
                   icon={ClipboardList}
@@ -1627,10 +1717,10 @@ function PatientsView({
                 />
               ) : (
                 (ass || []).map((a) => {
-                  const isSubmitted = !!a.submission?.submittedAt;
+                  const isSubmitted = a.status === "completed";
                   return (
                     <div
-                      key={a.id}
+                      key={a._id}
                       className="flex items-start gap-3 rounded-xl border p-3"
                     >
                       <div className="grid h-8 w-8 place-items-center rounded-lg bg-zinc-900 text-white">
@@ -1649,43 +1739,16 @@ function PatientsView({
 
                         <div className="mt-1 text-xs text-zinc-500">
                           Hạn: {fmtDateTime(a.dueDate || a.due)}{" "}
-                          {isSubmitted && a.submission?.submittedAt
-                            ? `• Nộp: ${fmtDateTime(a.submission.submittedAt)}`
-                            : ""}
                         </div>
-
-                        {!!a.feedback?.text && (
-                          <div className="mt-2 rounded-lg border bg-zinc-50 p-2 text-xs text-zinc-700">
-                            <span className="font-medium">Phản hồi:</span>{" "}
-                            {a.feedback.text}
-                          </div>
-                        )}
                       </div>
 
                       <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
-                        {isSubmitted ? (
-                          <>
-                            <IconBtn
-                              icon={FileText}
-                              onClick={() => setViewA(a)}
-                            >
-                              Chi tiết
-                            </IconBtn>
-                            <IconBtn
-                              icon={NotebookPen}
-                              onClick={() => {
-                                setFeedbackA(a);
-                                setFeedbackText(a.feedback?.text || "");
-                              }}
-                            >
-                              Phản hồi
-                            </IconBtn>
-                          </>
-                        ) : (
-                          <IconBtn icon={Pencil} onClick={() => openEdit(a)}>
-                            Sửa
-                          </IconBtn>
-                        )}
+                        <IconBtn
+                          icon={FileText}
+                          onClick={() => setNav("homework")}
+                        >
+                          Chi tiết
+                        </IconBtn>
                       </div>
                     </div>
                   );
@@ -2028,6 +2091,7 @@ function MessagesView({
     sendMessage,
     subcribeToMessages,
     unSubcribeToMessages,
+    setMessages,
   } = useUserContext();
   const [text, setText] = useState("");
   const [room, setRoom] = useState([]);
@@ -2335,8 +2399,8 @@ function findCallsInHour(calls, date, hour) {
   const sMs = start.getTime();
   const eMs = end.getTime();
   return (calls || []).filter((c) => {
-    const cs = new Date(c.startISO || c.start || c.startAt).getTime();
-    return cs >= sMs && cs < eMs;
+    const cs = new Date(c.startTime).getTime();
+    return cs >= sMs && cs < eMs && c.status !== "cancelled";
   });
 }
 
@@ -2366,25 +2430,28 @@ function dayLabel(d) {
 function CalendarView({
   calls = [],
   patients = [],
+  rooms,
   onCreateCall, // (payload) => void
-  onJoinCall, // (call) => void
+  setOpenCall,
+  setOpenCallDetails,
+  sessions,
+  setCallRoomId,
+  setSessionData,
 }) {
   // NEW: tuần đang hiển thị (mặc định tuần hiện tại)
   const [weekRef, setWeekRef] = React.useState(new Date());
   const week = buildWeekNoSunday(weekRef); // T2..T7
-  const hours = Array.from({ length: 12 }, (_, i) => 8 + i); // 08:00 - 19:00
-
+  const hours = Array.from({ length: 23 }, (_, i) => 0 + i); // 08:00 - 19:00
   // Lưu tạm lịch mới tạo để hiển thị ngay
   const [internalCalls, setInternalCalls] = React.useState([]);
   const allCalls = React.useMemo(() => {
     const map = new Map();
     [...(calls || []), ...internalCalls].forEach((c) => {
-      const key = c.id || `${c.startISO || c.start}-${c.patientId || ""}`;
+      const key = `${c.startTime}-${c.endTime}`;
       if (!map.has(key)) map.set(key, c);
     });
     return [...map.values()];
   }, [calls, internalCalls]);
-
   // Modal đặt lịch
   const [open, setOpen] = React.useState(false);
   const [patientQuery, setPatientQuery] = React.useState("");
@@ -2424,41 +2491,39 @@ function CalendarView({
     setPickTime("09:00");
   };
 
-  const confirmCreate = () => {
-    if (!pickedPatientId || !startDT || !endDT) return;
-    if (isSunday(startDT)) {
-      alert("Đã bỏ Chủ Nhật khỏi lịch. Vui lòng chọn ngày T2–T7.");
+  const confirmCreate = async () => {
+    if (!pickedPatientId) {
+      alert("Vui lòng chọn bệnh nhân ");
       return;
     }
-
-    const payload = {
-      id: `local_${startDT.getTime()}_${pickedPatientId}`,
-      patientId: pickedPatientId,
-      startISO: startDT.toISOString(),
-      endISO: endDT.toISOString(), // tự động = start + 45'
-      roomId: `room_${startDT.getTime()}`,
-      status: "scheduled",
-      durationMin: CALL_DURATION_MIN,
-    };
-
-    // 1) Hiển thị ngay
-    setInternalCalls((prev) => [payload, ...prev]);
-
-    // 2) Chuyển view sang tuần chứa ngày vừa đặt (để chắc chắn thấy slot)
-    setWeekRef(startDT);
-
-    // 3) Gọi parent/backend nếu có
-    if (typeof onCreateCall === "function") {
-      onCreateCall(payload);
+    if (!startDT || !endDT) return;
+    if (isSunday(startDT)) {
+      alert("Chủ nhật không làm việc. Vui lòng chọn ngày T2–T7.");
+      return;
     }
+    const room = rooms.find((e) => e.userId === pickedPatientId);
+    console.log(room);
+    const payload = {
+      roomId: room._id,
+      startTime: startDT,
+      endTime: endDT,
+      status: "pending",
+    };
+    console.log(payload);
+    // // 1) Hiển thị ngay
 
-    setOpen(false);
-  };
+    // // 2) Chuyển view sang tuần chứa ngày vừa đặt (để chắc chắn thấy slot)
 
-  const joinCall = (call) => {
-    if (typeof onJoinCall === "function") return onJoinCall(call);
-    const rid = call.roomId || call.id || "demo";
-    window.open(`/call/${rid}`, "_blank");
+    // // 3) Gọi parent/backend nếu có
+    // if (typeof onCreateCall === "function") {
+    const check = await onCreateCall(payload);
+    console.log(check);
+    if (check === true) {
+      setInternalCalls((prev) => [payload, ...prev]);
+      setWeekRef(startDT);
+      setOpen(false);
+    }
+    // }
   };
 
   return (
@@ -2528,7 +2593,11 @@ function CalendarView({
               hour={h}
               calls={allCalls}
               patients={patients}
-              onJoinCall={joinCall}
+              setOpenCall={setOpenCall}
+              setOpenCallDetails={setOpenCallDetails}
+              sessions={sessions}
+              setCallRoomId={setCallRoomId}
+              setSessionData={setSessionData}
             />
           ))}
         </div>
@@ -2550,7 +2619,7 @@ function CalendarView({
             <IconBtn
               className="border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-500!"
               onClick={confirmCreate}
-              disabled={!pickedPatientId || !pickDate || !pickTime}
+              // disabled={!pickedPatientId || !pickDate || !pickTime}
             >
               Xác nhận
             </IconBtn>
@@ -2614,7 +2683,7 @@ function CalendarView({
             />
             {pickDate && isSunday(new Date(`${pickDate}T00:00:00`)) && (
               <div className="mt-1 text-[11px] text-rose-600">
-                Lịch không hiển thị Chủ Nhật. Vui lòng chọn T2–T7.
+                Chủ nhật không làm việc. Vui lòng chọn T2–T7.
               </div>
             )}
           </div>
@@ -2630,8 +2699,7 @@ function CalendarView({
               onChange={(e) => setPickTime(e.target.value)}
             />
             <div className="mt-2 text-xs text-zinc-600">
-              Giờ kết thúc (tự động):{" "}
-              <span className="font-medium">{endLabel}</span>
+              Giờ kết thúc : <span className="font-medium">{endLabel}</span>
             </div>
           </div>
         </div>
@@ -2641,53 +2709,262 @@ function CalendarView({
 }
 
 // Ô lịch: hiển thị mọi cuộc hẹn bắt đầu trong giờ
-function CalendarCell({ date, hour, calls, patients, onJoinCall }) {
+function CalendarCell({
+  date,
+  hour,
+  calls,
+  patients,
+  setOpenCall,
+  setInternalCalls,
+  setOpenCallDetails,
+  setSessionData,
+  sessions,
+  setCallRoomId,
+}) {
   const callsInHour = findCallsInHour(calls, date, hour);
+  const [cancelModal, setCancelModal] = useState({
+    open: false,
+    call: null,
+    reason: "",
+  });
 
   if (callsInHour.length > 0) {
+    const now = new Date();
+    const nowMs = now.getTime();
+    const fifteenMs = 15 * 60 * 1000;
+
     return (
       <div className="p-2 text-xs space-y-2">
         {callsInHour.map((call) => {
-          const p = patients.find((x) => x.id === call.patientId) || {
-            name: "Bệnh nhân",
+          const p = patients.find(
+            (x) => x._id === call.roomId?.userId?._id
+          ) || {
+            accountId: { fullName: "Bệnh nhân" },
           };
+
+          const start = new Date(call.startTime);
+          const end = new Date(call.endTime);
+          const startMs = start.getTime();
+          const endMs = end.getTime();
+          const status = call.status;
+
+          const session =
+            sessions.find(
+              (e) => e?.appointmentId?.toString() === call?._id?.toString()
+            ) || null;
+          console.log(sessions);
+          const isCompleted =
+            (status === "completed" || status === "complete") && session;
+          const isPast = nowMs > endMs;
+          const isSoon = nowMs < startMs - fifteenMs; // dùng cho label "Sắp diễn ra"
+
+          const oneDayMs = 24 * 60 * 60 * 1000;
+          const diffMs = startMs - nowMs;
+          const canCancel = diffMs > oneDayMs; // ✅ chỉ cho phép hủy nếu còn hơn 1 ngày
+
+          let canJoin = false;
+          let btnLabel = "";
+
+          // Xác định nhãn nút chính
+          if (isSoon) {
+            btnLabel = "Sắp diễn ra";
+            canJoin = false;
+          } else if (nowMs >= startMs - fifteenMs && nowMs <= endMs) {
+            btnLabel = "Vào phòng";
+            canJoin = true;
+          } else if (isCompleted) {
+            btnLabel = "Xem chi tiết";
+            canJoin = true;
+          } else {
+            btnLabel = "Đã quá giờ";
+            canJoin = false;
+          }
+
+          // Tone màu card
+          let cardTone = "border-blue-200 bg-blue-50 text-blue-900"; // Sắp diễn ra (default)
+
+          if (canJoin && nowMs <= endMs) {
+            // Vào phòng
+            cardTone = "border-emerald-300 bg-emerald-50 text-emerald-900";
+          } else if (isCompleted) {
+            // Xem chi tiết
+            cardTone = "border-zinc-200 bg-zinc-50 text-zinc-800";
+          } else if (isPast && !isCompleted) {
+            // Đã quá giờ
+            cardTone = "border-rose-300 bg-rose-50 text-rose-900";
+          }
+
           return (
             <div
-              key={call.id || call.startISO}
-              className="flex flex-col justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-2 gap-1"
+              key={call._id || call.startTime}
+              className={`flex flex-col gap-2 relative rounded-xl border p-2 shadow-sm max-w-[130px] ${cardTone}`}
             >
-              <div className="font-medium text-emerald-900 truncate">
-                {p.accountId.fullName}
-              </div>
-              <div className="flex items-center justify-between flex-col">
-                <div className="text-[11px] text-emerald-800">
-                  {fmtTime(call.startISO || call.start)} –{" "}
-                  {fmtTime(call.endISO || call.end)}
+              {/* Hàng 1: Tên + giờ */}
+              <div className="flex flex-col justify-start items-center gap-1">
+                <div className="text-[12px] font-semibold text-zinc-800 truncate max-w-[100px]">
+                  {p.accountId.fullName}
                 </div>
+
+                <div className="text-[11px] text-zinc-600">
+                  {fmtTime(call.startTime)} – {fmtTime(call.endTime)}
+                </div>
+              </div>
+
+              {/* Hàng 2: Nút hành động + Hủy */}
+              <div className="flex items-center justify-center gap-2">
+                {/* Nút chính */}
                 <IconBtn
-                  icon={Video}
-                  className="border-emerald-300 text-emerald-700 hover:bg-emerald-100"
-                  onClick={() => onJoinCall && onJoinCall(call)}
+                  icon={
+                    btnLabel === "Vào phòng"
+                      ? Video
+                      : btnLabel === "Sắp diễn ra"
+                      ? Clock
+                      : btnLabel === "Xem chi tiết"
+                      ? FileText
+                      : AlertCircleIcon
+                  }
+                  className={`border text-[11px] px-3 py-1.5 
+                ${
+                  btnLabel === "Vào phòng"
+                    ? "border-emerald-400! text-emerald-700 bg-white hover:bg-emerald-700! hover:text-white"
+                    : btnLabel === "Xem chi tiết"
+                    ? "border-zinc-400! text-zinc-700 bg-white hover:bg-zinc-500 hover:text-white"
+                    : btnLabel === "Đã quá giờ"
+                    ? "border-rose-400! text-rose-600 bg-rose-50 cursor-not-allowed"
+                    : "border-blue-400! text-blue-700 bg-blue-50 cursor-not-allowed"
+                }
+              `}
+                  disabled={!canJoin && !isCompleted}
+                  onClick={() => {
+                    if (btnLabel === "Xem chi tiết") {
+                      setSessionData(session);
+                      setOpenCallDetails(true);
+                    }
+                    if (canJoin) {
+                      setOpenCall(true);
+                      setCallRoomId(call._id);
+                    }
+                  }}
                 >
-                  Vào phòng
+                  {btnLabel}
                 </IconBtn>
               </div>
+              {isSoon && (
+                <XIcon
+                  className={`rounded-full border p-1 text-[11px] transition absolute -right-2 -top-2
+      ${
+        canCancel
+          ? "border-rose-300! text-rose-600 hover:bg-rose-500 hover:text-white hover:cursor-pointer"
+          : "border-zinc-400! text-zinc-600 cursor-not-allowed"
+      }
+    `}
+                  onClick={() => {
+                    if (!canCancel) {
+                      alert("Bạn chỉ được hủy cuộc hẹn trước ít nhất 1 ngày.");
+                      return;
+                    }
+
+                    setCancelModal({
+                      open: true,
+                      call,
+                      reason: "",
+                    });
+                  }}
+                />
+              )}
             </div>
           );
         })}
+        {cancelModal.open && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-5 w-full max-w-lg shadow-lg">
+              <h3 className="text-lg font-semibold mb-1">
+                Hủy cuộc hẹn với bệnh nhân{" "}
+                {cancelModal.call.roomId.userId.accountId.fullName}
+              </h3>
+
+              <label className="text-sm text-slate-600">
+                Vui lòng nhập lý do tại sao lại muốn hủy{" "}
+                <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                className="w-full border rounded-lg p-2 mt-1.5 text-sm"
+                placeholder="Nhập lý do..."
+                value={cancelModal.reason}
+                onChange={(e) =>
+                  setCancelModal((prev) => ({
+                    ...prev,
+                    reason: e.target.value,
+                  }))
+                }
+              />
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  className="px-3 py-1.5 rounded-lg border hover:bg-slate-50"
+                  onClick={() =>
+                    setCancelModal({ open: false, call: null, reason: "" })
+                  }
+                >
+                  Đóng
+                </button>
+
+                <button
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 text-white hover:bg-rose-700"
+                  onClick={async () => {
+                    if (!cancelModal.reason.trim()) {
+                      toast.error("Lý do hủy không được để trống.");
+                      return;
+                    }
+
+                    try {
+                      const res = await axiosInstance.patch(
+                        API_PATHS.APPOINTMENTS.UPDATE_APPOINTMENTS_BY_ID(
+                          cancelModal.call._id
+                        ),
+                        {
+                          status: "cancelled",
+                          reason: cancelModal.reason,
+                        }
+                      );
+
+                      toast.success("Đã hủy cuộc hẹn thành công");
+                      setInternalCalls((prev) =>
+                        prev.filter((c) => c._id !== cancelModal.call._id)
+                      );
+                      setCancelModal({ open: false, call: null, reason: "" });
+                    } catch (err) {
+                      toast.error(err.message);
+                    }
+                  }}
+                >
+                  Gửi
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
-  return <div className="h-16 p-2 text-[11px] text-zinc-300">—</div>;
+
+  return (
+    <div className="h-16 p-2 text-[11px] text-zinc-300 flex justify-center">
+      —
+    </div>
+  );
 }
 
 // ---------------------------- Homework --------------------------------
 function HomeworkView({
   assignments, // mảng HomeworkAssignment từ backend
+  homeworkSubmissions,
   patients, // mảng bệnh nhân để map userId -> tên
   activePatientId = patients[0]._id, // id bệnh nhân đang chọn
   onAssignOpen,
   onUpdate, // optional: async (id, payload) => ...
+  setAssignments,
+  setHomeworkSubmissions,
 }) {
   const [q, setQ] = useState("");
 
@@ -2701,9 +2978,9 @@ function HomeworkView({
 
   // Danh sách bài tập của bệnh nhân đang chọn
   const ass = useMemo(() => {
-    return (assignments || []).filter(
-      (a) => String(a.userId) === String(activePatientId)
-    );
+    return (assignments || [])
+      .filter((a) => String(a.userId) === String(activePatientId))
+      .reverse();
   }, [assignments, activePatientId]);
 
   // Filter theo title
@@ -2722,43 +2999,25 @@ function HomeworkView({
 
   const statusLabel = (status) => {
     switch (status) {
-      case "assigned":
-        return "Đã giao";
-      case "in_progress":
-        return "Đang làm";
       case "completed":
-        return "Hoàn thành";
+        return "Đã nộp";
       case "overdue":
-        return "Quá hạn";
+        return "Đã quá hạn";
+      case "assigned":
       default:
-        return "Không rõ";
+        return "Chưa nộp";
     }
   };
 
   const statusTone = (status) => {
     switch (status) {
       case "completed":
-        return "success";
+        return "success"; // màu xanh
       case "overdue":
-        return "danger";
-      case "in_progress":
-        return "info";
+        return "danger"; // màu đỏ
       case "assigned":
       default:
-        return "warn";
-    }
-  };
-
-  const freqLabel = (f) => {
-    switch (f) {
-      case "once":
-        return "Một lần";
-      case "daily":
-        return "Hàng ngày";
-      case "weekly":
-        return "Hàng tuần";
-      default:
-        return "—";
+        return "warn"; // màu vàng/cam
     }
   };
 
@@ -2767,11 +3026,18 @@ function HomeworkView({
   // --------- STATE cho popup xem & sửa ---------
   const [viewA, setViewA] = useState(null); // bài đang xem chi tiết
   const [editA, setEditA] = useState(null); // bài đang chỉnh sửa
+  const [submissionFeedback, setSubmissionFeedback] = useState({});
+
+  const submissionsOfA = useMemo(() => {
+    if (!viewA) return [];
+    return (homeworkSubmissions || []).filter(
+      (s) => String(s.assignmentId) === String(viewA._id)
+    );
+  }, [homeworkSubmissions, viewA]);
 
   const [editTitle, setEditTitle] = useState("");
   const [editMethod, setEditMethod] = useState("");
   const [editDifficulty, setEditDifficulty] = useState("medium");
-  const [editFrequency, setEditFrequency] = useState("daily");
   const [editDueDate, setEditDueDate] = useState("");
   const [editEstimatedMinutes, setEditEstimatedMinutes] = useState("");
   const [editContent, setEditContent] = useState("");
@@ -2791,6 +3057,37 @@ function HomeworkView({
   // Mở popup xem
   const handleView = (a) => {
     setViewA(a);
+    const fb = {};
+    (homeworkSubmissions || [])
+      .filter((s) => String(s.assignmentId) === String(a._id))
+      .forEach((s) => {
+        fb[s._id] = s.feedbackDoctor || "";
+      });
+
+    setSubmissionFeedback(fb);
+  };
+  const handleSaveSubmissionFeedback = async (submissionId) => {
+    const content = (submissionFeedback[submissionId] || "").trim();
+
+    try {
+      await axiosInstance.patch(
+        API_PATHS.HOMEWORK_SUBMISSIONS.UPDATE_FEEDBACK_BY_ID(submissionId),
+        { feedbackDoctor: content }
+      );
+
+      setHomeworkSubmissions((prev) =>
+        prev.map((s) =>
+          s._id === submissionId
+            ? { ...s, feedbackDoctor: content } // cập nhật đúng submission đó
+            : s
+        )
+      );
+      setViewA(null);
+      toast.success("Đã lưu phản hồi cho bài nộp.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Lưu phản hồi thất bại, vui lòng thử lại.");
+    }
   };
 
   // Mở popup chỉnh sửa
@@ -2799,7 +3096,6 @@ function HomeworkView({
     setEditTitle(a.title || "");
     setEditMethod(a.method || "");
     setEditDifficulty(a.difficulty || "medium");
-    setEditFrequency(a.frequency || "daily");
     setEditDueDate(toLocalInputValue(a.dueDate));
     setEditEstimatedMinutes(a.estimatedMinutes || "");
     setEditContent(a.content || "");
@@ -2813,7 +3109,6 @@ function HomeworkView({
       title: editTitle.trim(),
       method: editMethod.trim(),
       difficulty: editDifficulty,
-      frequency: editFrequency,
       content: editContent.trim(),
       estimatedMinutes: editEstimatedMinutes
         ? Number(editEstimatedMinutes)
@@ -2902,12 +3197,10 @@ function HomeworkView({
           // màu cạnh trái theo status
           const borderStripe =
             a.status === "completed"
-              ? "border-l-4 border-l-emerald-500"
+              ? "border-l-4 border-l-emerald-500" // đã nộp
               : a.status === "overdue"
-              ? "border-l-4 border-l-rose-500"
-              : a.status === "in_progress"
-              ? "border-l-4 border-l-sky-500"
-              : "border-l-4 border-l-amber-400";
+              ? "border-l-4 border-l-rose-500" // đã quá hạn
+              : "border-l-4 border-l-amber-400"; // chưa nộp
 
           const attachmentsCount = (a.attachments || []).length;
 
@@ -2967,13 +3260,7 @@ function HomeworkView({
                         {convertDifficult(a.difficulty)}
                       </span>
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
-                      Tần suất:{" "}
-                      <span className="font-medium">
-                        {freqLabel(a.frequency)}
-                      </span>
-                    </span>
+
                     {a.estimatedMinutes && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5">
                         <Clock3 className="h-3 w-3" />~{a.estimatedMinutes} phút
@@ -3024,75 +3311,193 @@ function HomeworkView({
             </div>
           }
         >
-          <div className="space-y-3 text-sm">
-            <div>
-              <div className="text-zinc-500">Tiêu đề</div>
-              <div className="font-medium">{viewA.title}</div>
+          <div className="space-y-4 text-sm">
+            {/* Thông tin bài tập */}
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2 text-sm">
+                <div>
+                  <div className="text-zinc-500">Phương pháp</div>
+                  <div className="font-medium">{methodLabel(viewA.method)}</div>
+                </div>
+                <div>
+                  <div className="text-zinc-500">Độ khó</div>
+                  <div className="font-medium">
+                    {convertDifficult(viewA.difficulty)}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-zinc-500">Thời lượng ước tính</div>
+                  <div className="font-medium">
+                    {viewA.estimatedMinutes
+                      ? `${viewA.estimatedMinutes} phút`
+                      : "—"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-zinc-500">Hạn</div>
+                  <div className="font-medium">
+                    {viewA.dueDate
+                      ? fmtDateTime(viewA.dueDate)
+                      : "Không đặt hạn"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-zinc-500">Trạng thái</div>
+                  <div className="font-medium">{statusLabel(viewA.status)}</div>
+                </div>
+              </div>
+
+              {viewA.content && (
+                <div>
+                  <div className="text-zinc-500 mb-1">Hướng dẫn / Nội dung</div>
+                  <div className="whitespace-pre-wrap rounded-xl border bg-zinc-50 p-3 text-sm">
+                    {viewA.content}
+                  </div>
+                </div>
+              )}
+
+              {!!(viewA.attachments || []).length && (
+                <div>
+                  <div className="text-zinc-500 mb-1 flex items-center gap-1">
+                    <Paperclip className="h-4 w-4" /> Tệp đính kèm
+                  </div>
+                  <ul className="list-disc pl-5 text-sm">
+                    {viewA.attachments.map((url, i) => (
+                      <li key={i}>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-indigo-600 hover:underline break-all"
+                        >
+                          {url.split("/").at(-1)}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 text-sm">
-              <div>
-                <div className="text-zinc-500">Phương pháp</div>
-                <div className="font-medium">{methodLabel(viewA.method)}</div>
-              </div>
-              <div>
-                <div className="text-zinc-500">Độ khó</div>
-                <div className="font-medium">
-                  {convertDifficult(viewA.difficulty)}
+            {/* Bài nộp của bệnh nhân + feedback bác sĩ theo từng submission */}
+            {submissionsOfA.length > 0 ? (
+              <div className="space-y-3">
+                <div className="text-zinc-500 font-medium">
+                  Bài nộp của bệnh nhân
                 </div>
-              </div>
-              <div>
-                <div className="text-zinc-500">Tần suất</div>
-                <div className="font-medium">{freqLabel(viewA.frequency)}</div>
-              </div>
-              <div>
-                <div className="text-zinc-500">Thời lượng ước tính</div>
-                <div className="font-medium">
-                  {viewA.estimatedMinutes
-                    ? `${viewA.estimatedMinutes} phút`
-                    : "—"}
-                </div>
-              </div>
-              <div>
-                <div className="text-zinc-500">Hạn</div>
-                <div className="font-medium">
-                  {viewA.dueDate ? fmtDateTime(viewA.dueDate) : "Không đặt hạn"}
-                </div>
-              </div>
-              <div>
-                <div className="text-zinc-500">Trạng thái</div>
-                <div className="font-medium">{statusLabel(viewA.status)}</div>
-              </div>
-            </div>
 
-            {viewA.content && (
-              <div>
-                <div className="text-zinc-500 mb-1">Hướng dẫn / Nội dung</div>
-                <div className="whitespace-pre-wrap rounded-xl border bg-zinc-50 p-3 text-sm">
-                  {viewA.content}
-                </div>
-              </div>
-            )}
+                {submissionsOfA.map((sub, idx) => {
+                  const attach = sub.attachments || sub.attachmentUrls || [];
 
-            {!!(viewA.attachments || []).length && (
-              <div>
-                <div className="text-zinc-500 mb-1 flex items-center gap-1">
-                  <Paperclip className="h-4 w-4" /> Tệp đính kèm
-                </div>
-                <ul className="list-disc pl-5 text-sm">
-                  {viewA.attachments.map((url, i) => (
-                    <li key={i}>
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-indigo-600 hover:underline break-all"
-                      >
-                        File {i + 1}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                  return (
+                    <div
+                      key={sub._id || idx}
+                      className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 space-y-3"
+                    >
+                      <div className="flex items-center justify-center text-xs text-zinc-500">
+                        {sub.createdAt && (
+                          <span>Nộp lúc: {fmtDateTime(sub.createdAt)}</span>
+                        )}
+                      </div>
+                      <hr className="text-gray-600" />
+                      {/* Cảm xúc */}
+                      <div className="grid gap-2 sm:grid-cols-2 text-xs">
+                        <div>
+                          <div className="text-zinc-500">
+                            Cảm xúc trước khi làm
+                          </div>
+                          <div className="font-medium">
+                            {sub.moodBefore || "—"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-zinc-500">
+                            Cảm xúc sau khi làm
+                          </div>
+                          <div className="font-medium">
+                            {sub.moodAfter || "—"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Câu trả lời */}
+                      {sub.answers && (
+                        <div>
+                          <div className="text-zinc-500 mb-1">
+                            Câu trả lời / Ghi chú
+                          </div>
+                          <div className="whitespace-pre-wrap rounded-lg border border-zinc-200 bg-white p-2 text-xs">
+                            {typeof sub.answers === "string"
+                              ? sub.answers
+                              : JSON.stringify(sub.answers, null, 2)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Attachment */}
+                      {attach.length > 0 && (
+                        <div>
+                          <div className="text-zinc-500 mb-1 flex items-center gap-1">
+                            <Paperclip className="h-3 w-3" /> Tệp đính kèm khi
+                            nộp
+                          </div>
+                          <ul className="list-disc pl-5 text-xs">
+                            {attach.map((url, i) => (
+                              <li key={i}>
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-indigo-600 hover:underline break-all"
+                                >
+                                  {url.split("/").at(-1)}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Phản hồi của bác sĩ cho bài nộp này */}
+                      <div className="space-y-1 pt-2 border-t border-zinc-300">
+                        <div className="text-xs text-zinc-500">
+                          Phản hồi của bác sĩ
+                        </div>
+                        <textarea
+                          rows={2}
+                          value={submissionFeedback[sub._id] || ""}
+                          onChange={(e) =>
+                            setSubmissionFeedback((prev) => ({
+                              ...prev,
+                              [sub._id]: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-zinc-200 p-2 text-xs outline-none focus:border-zinc-400"
+                          placeholder="Nhập phản hồi cho bài nộp này..."
+                        />
+                        {submissionFeedback[sub._id].trim().length > 0 &&
+                          submissionFeedback[sub._id] !==
+                            sub.feedbackDoctor && (
+                            <div className="flex justify-end">
+                              <IconBtn
+                                className="border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-700!"
+                                onClick={() =>
+                                  handleSaveSubmissionFeedback(sub._id)
+                                }
+                              >
+                                Lưu phản hồi
+                              </IconBtn>
+                            </div>
+                          )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-xs text-zinc-500">
+                Bài tập này hiện chưa có bài nộp nào từ bệnh nhân.
               </div>
             )}
           </div>
@@ -3152,21 +3557,6 @@ function HomeworkView({
                   <option value="easy">Dễ</option>
                   <option value="medium">Trung bình</option>
                   <option value="hard">Khó</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Tần suất
-                </label>
-                <select
-                  value={editFrequency}
-                  onChange={(e) => setEditFrequency(e.target.value)}
-                  className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-400"
-                >
-                  <option value="once">Một lần</option>
-                  <option value="daily">Hàng ngày</option>
-                  <option value="weekly">Hàng tuần</option>
                 </select>
               </div>
 
@@ -3234,7 +3624,7 @@ function NotificationsView({ notifications, onMarkAll }) {
         )}
         {notifications.map((n) => (
           <div
-            key={n.id}
+            key={n._id}
             className={`flex items-center gap-3 rounded-2xl border p-3 ${
               n.read ? "opacity-60" : ""
             }`}
@@ -3707,7 +4097,8 @@ function SettingsView({ doctor, onSave, onCancel }) {
 // ---------------------------- Utilities -------------------------------
 function nameOf(listOrPatients, id) {
   const arr = Array.isArray(listOrPatients) ? listOrPatients : [];
-  return arr.find((p) => p._id === id)?.name || id;
+  console.log(listOrPatients);
+  return arr.find((p) => p._id === id)?.accountId.fullName || id;
 }
 
 function toLocalInputValue(iso) {

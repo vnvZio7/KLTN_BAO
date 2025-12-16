@@ -500,7 +500,12 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
 }
 
 /* ---------------- Doctor info page ---------------- */
-export default function DoctorInfoPage({ doctor, suggestions = [], onSwitch }) {
+export default function DoctorInfoPage({
+  user,
+  doctor,
+  suggestions = [],
+  onSwitch,
+}) {
   const [openSwitch, setOpenSwitch] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
   const [certIndex, setCertIndex] = useState(0);
@@ -544,12 +549,15 @@ export default function DoctorInfoPage({ doctor, suggestions = [], onSwitch }) {
             </div>
           </div>
           <div className="flex flex-col gap-2">
-            <button
-              onClick={() => setOpenSwitch(true)}
-              className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 shadow-sm"
-            >
-              Đổi bác sĩ
-            </button>
+            {user?.switchDoctor &&
+              user?.switchDoctor?.at(-1)?.switchDoctorStatus !== "pending" && (
+                <button
+                  onClick={() => setOpenSwitch(true)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 shadow-sm"
+                >
+                  Đổi bác sĩ
+                </button>
+              )}
           </div>
         </div>
       </section>

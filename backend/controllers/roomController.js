@@ -1,4 +1,5 @@
 import Room from "../models/room.model.js";
+import { createNotification } from "./notificationController.js";
 // @desc    Get all rooms (Admin only)
 // @route   GET /api/rooms/
 // @access  Private (Admin)
@@ -36,8 +37,20 @@ const createRoom = async (req, res) => {
       userId: req.user._id,
       doctorId: req.body.doctorId,
     });
-    console.log(room);
-    console.log(req.body.doctorId);
+    await createNotification({
+      userId: req.user._id,
+      title1: "Kết nối thành công tới bác sĩ",
+      message:
+        "Hệ thống đã kết nối thành công bạn với bác sĩ. Xem chi tiết ở trang thông tin bác sĩ",
+      type: "system",
+    });
+    await createNotification({
+      doctorId: req.body.doctorId,
+      title1: "Bệnh nhân mới",
+      message: `Bạn vừa được ghép nối với một bệnh nhân - ${req.account.fullName}`,
+      type: "system",
+    });
+
     res.status(201).json({ message: "Đã tạo room thành công!", room });
   } catch (err) {
     console.error("create error:", err);

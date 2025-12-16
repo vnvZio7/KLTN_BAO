@@ -15,6 +15,14 @@ const appointmentSchema = new mongoose.Schema({
     default: "pending",
   },
   reason: String,
+  notifiedToday: {
+    type: Boolean,
+    default: false,
+  },
+  notified15m: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: { type: Date, default: Date.now },
 });
 

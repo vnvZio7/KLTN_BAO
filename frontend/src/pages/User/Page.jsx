@@ -15,6 +15,7 @@ import PaymentModal from "../../components/payments/PaymentModal";
 import { generateTransactionCode } from "../../utils/helper";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import SessionDetailPopup from "../../components/SessionDetailPopup";
 
 export default function Page() {
   const [active, setActive] = useState("stats");
@@ -25,94 +26,74 @@ export default function Page() {
     currentDoctor,
     handleLogout,
     assignments,
+    appointments,
     room,
     sendMessage,
     messages,
+    setMessages,
     onlineUsers,
+    setUser,
+    homeworkSubmissions,
+    setHomeworkSubmissions,
+    notifications,
+    setNotifications,
+    sessions,
   } = useUserContext();
-  const [appointments, setAppointments] = useState([]);
 
-  useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        const room = await axiosInstance.get(API_PATHS.ROOMS.GET_ROOM);
-        console.log("Room");
-        const roomId = room.data.room._id;
-        const { data } = await axiosInstance.get(
-          API_PATHS.APPOINTMENTS.GET_APPOINTMENTS_BY_ROOMID(roomId)
-        );
-        setAppointments(data.appointments);
-      } catch (error) {
-        console.error(error.messages);
-      }
-    };
-
-    fetchAppointments();
-  }, []);
   const [open, setOpen] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
-
+  const [sessionData, setSessionData] = useState([]);
+  const [openCallDetails, setOpenCallDetails] = useState(false);
+  const pill = currentDoctor.pricePerWeek - user.walletBalance;
   const handleConfirm = async () => {
     try {
       const transaction = await axiosInstance.get(
         API_PATHS.TRANSACTIONS.GET_TRANSACTION_BY_CODE(paymentData.orderCode)
       );
       console.log(transaction);
-      if (transaction) {
+      if (transaction.data.success) {
         toast.success("Thanh toán thành công");
+        await axiosInstance.patch(
+          API_PATHS.TRANSACTIONS.UPDATE_TRANSACTION(
+            transaction.data.transaction._id
+          ),
+          {
+            roomId: room._id,
+          }
+        );
+        navigate("/user");
+      } else {
+        toast.error(transaction.data.message);
       }
-      navigate("/user");
     } catch (error) {
       toast.error(error.message);
       console.log(error);
     }
   };
-  const [notifications, setNotifications] = useState([
-    {
-      id: "n1",
-      type: "appointment",
-      title: "Nhắc lịch: 14:00 hôm nay",
-      body: "Lịch gọi video với BS. Lan Nguyễn.",
-      time: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-      read: false,
-    },
-    {
-      id: "n2",
-      type: "message",
-      title: "Tin nhắn mới",
-      body: 'BS. Minh: "Bạn nhớ điền nhật ký giấc ngủ nhé."',
-      time: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-      read: false,
-    },
-    {
-      id: "n3",
-      type: "system",
-      title: "Cập nhật tính năng",
-      body: "Thêm bộ lọc thông báo và đánh dấu đã đọc.",
-      time: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-      read: true,
-    },
-  ]);
-  const [unreadChat, setUnreadChat] = useState(2);
-  useEffect(() => {
-    if (active === "chat") setUnreadChat(0);
-  }, [active]);
 
-  const onAppointmentBooked = (item) => {
-    setNotifications((prev) => [
-      {
-        id: Math.random().toString(36).slice(2),
-        type: "appointment",
-        title: "Đã đặt lịch mới",
-        body: `${item.doctorName} · ${new Date(item.time).toLocaleString(
-          "vi-VN"
-        )}`,
-        time: new Date().toISOString(),
-        read: false,
-      },
-      ...prev,
-    ]);
-  };
+  const unreadChat = useMemo(() => {
+    return messages.filter((m) => !m.read && m.senderType !== "user").length;
+  }, [messages]);
+  useEffect(() => {
+    if (active === "chat") {
+      axiosInstance.patch(
+        API_PATHS.MESSAGES.UPDATE_READ_MESSAGES_BY_ROOM_ID(room._id)
+      );
+    }
+    setMessages((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, [active]);
+  useEffect(() => {
+    if ((user.freeCall === 1 || user.firstCallInWeek === true) && pill > 0) {
+      setPaymentData({
+        amount: pill,
+        orderCode: generateTransactionCode(),
+        messages:
+          "Vui lòng thanh toán số tiền còn thiếu trước khi sử dụng dịch vụ",
+        required: true,
+      });
+      setOpen(true); // 👉 mở modal
+    }
+  }, [active]);
 
   const unreadNotif = useMemo(
     () => notifications.filter((n) => !n.read).length,
@@ -139,16 +120,51 @@ export default function Page() {
         <SchedulePage
           doctor={currentDoctor}
           appointments={appointments}
-          setAppointments={setAppointments}
-          onBooked={onAppointmentBooked}
+          sessions={sessions}
+          onReview={(session) => {
+            setSessionData(session);
+            setOpenCallDetails(true);
+          }}
         />
       )}
       {active === "doctor" && (
         <DoctorInfoPage
+          user={user}
           doctor={currentDoctor}
           suggestions={doctors} // <— truyền mảng gợi ý
-          onSwitch={({ picked, reason }) => {
-            toast.success(picked + reason);
+          onSwitch={async ({ picked, reason }) => {
+            console.log(picked);
+            try {
+              const user1 = await axiosInstance.patch(
+                API_PATHS.USERS.UPDATE_SWITCH_DOCTOR,
+                {
+                  currentDoctorId: user.currentDoctorId,
+                  switchDoctorId: picked.id,
+                  status: "pending",
+                  reason,
+                }
+              );
+              // if (user)
+              toast.success(
+                "Yêu cầu đã được gửi lên admin. Vui lòng đợi phản hồi"
+              );
+              setUser((prev) => ({
+                ...prev,
+                switchDoctor: [
+                  ...(prev.switchDoctor || []), // giữ lại các yêu cầu cũ
+                  {
+                    currentDoctorId: prev.currentDoctorId,
+                    switchDoctorId: picked.id,
+                    switchDoctorStatus: "pending",
+                    reason,
+                  },
+                ],
+              }));
+            } catch (e) {
+              console.error(e.message);
+              toast.error(e.message);
+            }
+            // toast.success(picked.name + reason);
             // const diff = picked.pricePerWeek - currentDoctor.pricePerWeek;
             // if (diff > 0) {
             //   setPaymentData({
@@ -162,26 +178,44 @@ export default function Page() {
           }}
         />
       )}
+
+      {openCallDetails ? (
+        <SessionDetailPopup
+          open={true}
+          onClose={() => {
+            setSessionData([]);
+            setOpenCallDetails(false);
+          }}
+          session={sessionData}
+        />
+      ) : null}
       {open && paymentData && (
         <PaymentModal
           amount={paymentData.amount}
           orderCode={paymentData.orderCode}
+          message={paymentData.messages}
           open={open}
           onClose={() => setOpen(false)}
+          required={paymentData.required}
           onConfirmed={handleConfirm}
         />
       )}
+
       {active === "homework" && (
-        <DoctorHomeworkPage assignments={assignments} />
+        <DoctorHomeworkPage
+          assignments={assignments}
+          submissions={homeworkSubmissions}
+          setHomeworkSubmissions={setHomeworkSubmissions}
+        />
       )}
 
       {active === "chat" && (
         <ChatPage
           room={room}
           onSend={sendMessage}
+          setMessages={setMessages}
           doctor={currentDoctor}
           messages={messages}
-          setUnreadChat={setUnreadChat}
           onlineUsers={onlineUsers}
         />
       )}

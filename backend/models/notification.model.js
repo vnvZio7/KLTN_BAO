@@ -21,11 +21,10 @@ const notificationSchema = new mongoose.Schema(
     type: {
       type: String,
       enum: [
-        "doctor-switch-request", // user yêu cầu đổi bác sĩ
-        "doctor-approved", // admin duyệt
         "payment", // thanh toán, upgrade
         "system", // thông báo hệ thống chung
         "homework", // thông báo BTVN
+        "call", // thông báo BTVN
       ],
       default: "system",
     },
@@ -34,5 +33,7 @@ const notificationSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
+notificationSchema.index({ userId: 1, createdAt: -1 });
+notificationSchema.index({ doctorId: 1, createdAt: -1 });
+notificationSchema.index({ admin: 1, createdAt: -1 });
 export default mongoose.model("Notification", notificationSchema);

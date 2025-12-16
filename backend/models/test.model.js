@@ -9,6 +9,11 @@ const testSchema = new mongoose.Schema({
       question: String,
       options: [String],
       scores: [Number], // điểm tương ứng với mỗi lựa chọn
+      mapping: {
+        type: Map,
+        of: [String],
+        default: {},
+      },
     },
   ],
   maxScrore: Number,

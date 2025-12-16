@@ -81,4 +81,26 @@ const getMessageByRoomId = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-export { getMessages, sendMessage, getMessageByRoomId };
+
+const readMessageByRoomId = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const messages = await Message.updateMany(
+      {
+        roomId: roomId,
+        senderType: { $ne: req.account.role }, // ví dụ: "user" hoặc "doctor"
+      },
+      {
+        $set: {
+          read: true, // hoặc trường bạn muốn update
+        },
+      }
+    );
+
+    console.log(messages);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+export { getMessages, sendMessage, getMessageByRoomId, readMessageByRoomId };

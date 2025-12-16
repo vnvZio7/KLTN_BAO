@@ -4,6 +4,7 @@ import {
   getAccounts,
   getAllTransactions,
   updateApproval,
+  updateUserAfterSwitchDoctor,
 } from "../controllers/adminController.js";
 
 const router = express.Router();
@@ -13,5 +14,6 @@ const router = express.Router();
 router.get("/accounts", getAccounts);
 router.get("/transactions", getAllTransactions);
 router.patch("/doctors/:id/approval", protect, adminOnly, updateApproval);
+router.patch("/switch-doctor", protect, adminOnly, updateUserAfterSwitchDoctor);
 
 export default router;

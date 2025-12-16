@@ -11,13 +11,18 @@ export const API_PATHS = {
   USERS: {
     GET_ALL_USERS: "/api/users",
     UPDATE_USER: "/api/users",
-    // GET_USER_BY_ID: (userId) => `/api/users/${userId}`,
+    UPDATE_USER_RETEST: "/api/users/retest",
     GET_USERS_BY_DOCTORID: "/api/users/doctor",
+    GET_USERS_SWITCH_DOCTOR: "/api/users/switch-doctor",
+    UPDATE_SWITCH_DOCTOR: `/api/users/update`,
+    UPDATE_FREE_CALL: `/api/users/free-call`,
+    UPDATE_RETEST: (id) => `/api/users/retest/${id}`,
   },
   ADMIN: {
     GET_DASHBOARD_DATA: "/api/admin/dashboard",
     GET_ALL_ACCOUNTS: "/api/admin/accounts",
     GET_ALL_TRANSACTIONS: "/api/admin/transactions",
+    UPDATE_SWITCH_DOCTOR: "/api/admin/switch-doctor",
   },
   TESTS: {
     GET_ALL_TEST: "/api/tests",
@@ -48,12 +53,26 @@ export const API_PATHS = {
   },
   APPOINTMENTS: {
     // GET_ALL_SHOWTIMES: "/api/showtimes/",
-    // CREATE_SHOWTIMES: "/api/showtimes/",
+    CREATE_APPOINTMENT: "/api/appointments/",
     // GET_GENRES: "/api/showtimes/genres",
     // GET_SHOWTIMES_BY_ID_AND_DATE: (showtime_id, date) =>
     //   `/api/showtimes/${showtime_id}/${date}`,
     GET_APPOINTMENTS_BY_ROOMID: (roomId) => `/api/appointments/${roomId}`,
+    UPDATE_APPOINTMENTS_BY_ID: (id) => `/api/appointments/${id}`,
   },
+
+  SESSIONS: {
+    // GET_ALL_SHOWTIMES: "/api/showtimes/",
+    CREATE_SESSION: "/api/sessions/",
+    // GET_GENRES: "/api/showtimes/genres",
+    // GET_SHOWTIMES_BY_ID_AND_DATE: (showtime_id, date) =>
+    //   `/api/showtimes/${showtime_id}/${date}`,
+    GET_SESSIONS_BY_APPOINTMENT_ID: (appointmentId) =>
+      `/api/sessions/${appointmentId}`,
+    UPDATE_SESSION_BY_APPOINTMENT_ID: (appointmentId) =>
+      `/api/sessions/${appointmentId}`,
+  },
+
   EXERCISES: {
     GET_ALL_EXERCISES: "/api/exercises",
   },
@@ -61,10 +80,24 @@ export const API_PATHS = {
     GET_HOMEWORK_ASSIGNMENT_BY_ID: (userId) =>
       `/api/homework-assignments/${userId}`,
     CREATE_HOMEWORK_ASSIGNMENT: "/api/homework-assignments",
+    CREATE_HOMEWORK_ASSIGNMENT_BY_AI: "/api/homework-assignments/ai",
+  },
+  HOMEWORK_SUBMISSIONS: {
+    GET_HOMEWORK_SUBMISSION_BY_ID: (id) => `/api/homework-submissions/${id}`,
+    UPDATE_FEEDBACK_BY_ID: (id) => `/api/homework-submissions/${id}`,
+    CREATE_HOMEWORK_SUBMISSION: "/api/homework-submissions",
   },
   MESSAGES: {
     GET_MESSAGES_BY_ROOM_ID: (roomId) => `/api/messages/${roomId}`,
     SEND_MESSAGE: "/api/messages",
+    UPDATE_READ_MESSAGES_BY_ROOM_ID: (roomId) => `/api/messages/${roomId}`,
+  },
+  NOTIFY: {
+    // GET_ALL_BOOKINGS: "/api/bookings-users",
+    GET_ALL_NOTIFY: "/api/notify",
+    GET_ALL_NOTIFY_ADMIN: "/api/notify/admin",
+    UPDATE_MARK_ALL_READ: "/api/notify/mark-all-read",
+    UPDATE_MARK_READ_ONE: (id) => `/api/notify/mark-read/${id}`,
   },
   PAYMENT: {
     GET_SEPAY: "/api/payment/sepay",

@@ -26,6 +26,45 @@ io.on("connection", (socket) => {
 
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
   console.log("online:", userSocketMap);
+
+  socket.on("join-room", (roomId) => {
+    socket.join(roomId);
+    socket.to(roomId).emit("user-joined", socket.id);
+  });
+
+  socket.on("offer", (data) => {
+    socket.to(data.to).emit("offer", {
+      from: socket.id,
+      offer: data.offer,
+    });
+  });
+
+  socket.on("answer", (data) => {
+    socket.to(data.to).emit("answer", {
+      from: socket.id,
+      answer: data.answer,
+    });
+  });
+
+  socket.on("ice-candidate", (data) => {
+    socket.to(data.to).emit("ice-candidate", {
+      from: socket.id,
+      candidate: data.candidate,
+    });
+  });
+  // 🆕 sync trạng thái mic / cam
+  socket.on("media-state", ({ roomId, micOn, camOn }) => {
+    socket.to(roomId).emit("peer-media-state", {
+      id: socket.id,
+      micOn,
+      camOn,
+    });
+  });
+  // 🆕 Một client rời khỏi phòng (bấm kết thúc)
+  socket.on("leave-room", ({ roomId }) => {
+    socket.leave(roomId);
+    socket.to(roomId).emit("peer-left", { id: socket.id });
+  });
   socket.on("disconnect", () => {
     console.log("A user disconnected", socket.id);
     delete userSocketMap[userId];

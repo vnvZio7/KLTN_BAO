@@ -8,8 +8,9 @@ import { generateTransactionCode } from "../../utils/helper";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { useUserContext } from "../../context/userContext";
+import CombinedQuiz from "./CombinedQuiz";
 
-const CODES = ["PHQ-9", "GAD-7"]; // Thứ tự: PHQ-9 trước, GAD-7 sau
+const CODES = ["PHQ-9", "GAD-7", "THERAPY_MATCH"]; // Thứ tự: PHQ-9 trước, GAD-7 sau
 
 export default function TestAndMatch() {
   const { fetchUser } = useUserContext();
@@ -27,6 +28,7 @@ export default function TestAndMatch() {
   const [needDoctor, setNeedDoctor] = useState(false);
   const [matchError, setMatchError] = useState("");
   const [doctors, setDoctors] = useState([]);
+  const [suggestedExercises, setSuggestedExercises] = useState([]);
   const [reason, setReason] = useState("");
   const [spec, setSpec] = useState("");
   const [levels, setLevels] = useState([]);
@@ -40,7 +42,7 @@ export default function TestAndMatch() {
   const token = ""; // ví dụ auth
   const navigate = useNavigate();
 
-  // ---------- Tải 2 bài test ----------
+  // ---------- Tải bài test ----------
   useEffect(() => {
     let mounted = true;
 
@@ -136,6 +138,7 @@ export default function TestAndMatch() {
         // Không tự reset pickedDoctorId nếu user quay lại từ bước 3
         if (pickedDoctorId == null) setPickedDoctorId(null);
         setDoctors([]);
+        setSuggestedExercises([]);
         setReason("");
         setNeedDoctor(false);
         setLevels([]);
@@ -144,6 +147,7 @@ export default function TestAndMatch() {
         const payload = {
           tests: CODES.map((code) => ({
             code,
+            answers: answers[code],
             scores: (answers[code] || []).map(
               (idx, i) => testsMap[code].questions[i].scores[idx]
             ),
@@ -159,11 +163,13 @@ export default function TestAndMatch() {
         const data = response?.data?.doctors || [];
         setReason(response?.data?.reason || "");
         setDoctors(Array.isArray(data) ? data : []);
+        setSuggestedExercises(response?.data?.suggestedExercises);
         setLevels({
           "PHQ-9": response?.data?.phqLevel || "",
           "GAD-7": response?.data?.gadLevel || "",
         });
         setNeedDoctor(response?.data?.needDoctor);
+
         setSpec(response?.data?.spec || "");
       } catch (e) {
         if (mounted)
@@ -255,74 +261,6 @@ export default function TestAndMatch() {
   };
 
   // ---------- Quizz gộp (mỗi đáp án 1 dòng, KHÔNG radio, KHÔNG ABCD, KHÔNG css trạng thái đã chọn; chữ căn giữa; nút nhỏ) ----------
-  const QuizCombined = () => {
-    if (!curEntry) return null;
-    const { code, qIndex, q, title, desc } = curEntry;
-
-    const pick = (optIdx) => {
-      setAnswers((prev) => {
-        const next = { ...prev };
-        const arr = [...(next[code] || [])];
-        arr[qIndex] = optIdx;
-        next[code] = arr;
-        return next;
-      });
-      const isLast = cur >= totalAll - 1;
-      setTimeout(() => {
-        if (!isLast) setCur((c) => c + 1);
-        else {
-          setStep(2); // hết câu cuối → sang ghép bác sĩ
-          window.scrollTo(0, 0);
-        }
-      }, 80);
-    };
-
-    const goPrev = () => setCur((c) => Math.max(0, c - 1));
-
-    return (
-      <Card>
-        <div className="relative">
-          {/* Nút quay lại ẩn khi là câu đầu tiên */}
-          {cur > 0 && (
-            <button
-              onClick={goPrev}
-              className="absolute inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Quay lại câu trước
-            </button>
-          )}
-          {/* Tiêu đề test theo câu hiện tại */}
-          <h2 className="text-2xl font-semibold text-teal-700 mb-2 text-center">
-            {title || code}
-          </h2>
-          {desc ? (
-            <p className="text-sm text-gray-600 mb-4 text-center">{desc}</p>
-          ) : null}
-        </div>
-
-        <div className="border border-gray-200 rounded-xl p-4">
-          <p className="font-medium text-gray-800 mb-3 text-center">
-            {cur + 1}. {q?.question}
-          </p>
-
-          {/* MỖI ĐÁP ÁN 1 DÒNG - BUTTON NHỎ, CHỮ CĂN GIỮA, KHÔNG CSS "ĐÃ CHỌN" */}
-          <div className="space-y-2">
-            {(q?.options || []).map((label, optIdx) => (
-              <button
-                key={optIdx}
-                type="button"
-                onClick={() => pick(optIdx)}
-                className="w-full text-center px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </Card>
-    );
-  };
 
   // ---------- Thẻ bác sĩ ----------
   // Card dọc: avatar tròn, tick góc, có label từng phần
@@ -523,6 +461,7 @@ export default function TestAndMatch() {
           API_PATHS.TRANSACTIONS.UPDATE_TRANSACTION(data.transaction._id),
           {
             roomId,
+            free: true,
           }
         );
         console.log("transaction: ", transaction);
@@ -553,13 +492,22 @@ export default function TestAndMatch() {
               testResultPHQ9.data.testResult._id,
               testResultGAD7.data.testResult._id,
             ],
+            lastPHQ9Score: computed["PHQ-9"]?.score,
+            lastGAD7Score: computed["GAD-7"]?.score,
             dominantSymptom: spec,
             doctorIds: doctors,
             currentDoctorId: pickedDoctorId._id,
             walletBalance: pickedDoctorId.pricePerWeek,
           }
         );
-        fetchUser();
+
+        const createAss = await axiosInstance.post(
+          API_PATHS.HOMEWORK_ASSIGNMENTS.CREATE_HOMEWORK_ASSIGNMENT_BY_AI,
+          {
+            suggestedExercises,
+          }
+        );
+        await fetchUser();
         navigate("/user");
       } else {
         toast.error(data.message);
@@ -605,7 +553,21 @@ export default function TestAndMatch() {
         </div>
 
         {/* B1: Quizz gộp PHQ-9 + GAD-7 (mỗi đáp án 1 dòng, không radio/ABCD/chọn-style) */}
-        {step === 1 && <QuizCombined />}
+        {step === 1 && (
+          <CombinedQuiz
+            joined={joined}
+            cur={cur}
+            setCur={setCur}
+            answers={answers}
+            onAnswersChange={setAnswers}
+            mode="auto" // chọn xong câu cuối -> onFinish
+            onFinish={(finalAnswers) => {
+              setAnswers(finalAnswers); // đảm bảo state sync
+              setStep(2); // sang bước match
+              window.scrollTo(0, 0);
+            }}
+          />
+        )}
 
         {/* B2: Đề xuất bác sĩ — có Quay lại / Tiếp tục */}
         {step === 2 && (
@@ -743,6 +705,7 @@ export default function TestAndMatch() {
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 {CODES.map((code) => {
                   const t = testsMap[code];
+                  if (code === "THERAPY_MATCH") return;
                   return (
                     <div key={code} className="p-3 rounded-lg bg-white border">
                       <div className="font-medium text-gray-800">

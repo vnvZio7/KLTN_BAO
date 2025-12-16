@@ -23,13 +23,18 @@ export const UserProvider = ({ children }) => {
   const [doctors, setDoctors] = useState([]);
   const [patients, setPatients] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [homeworkSubmissions, setHomeworkSubmissions] = useState([]);
 
   const [room, setRoom] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [exercises, setExercises] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [userSwitchs, setUserSwitchs] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -44,9 +49,14 @@ export const UserProvider = ({ children }) => {
     setCurrentDoctor(null);
     setPatients([]);
     setAssignments([]);
+    setAppointments([]);
+    setSessions([]);
     setRoom(null);
     setRooms([]);
     setMessages([]);
+    setUserSwitchs([]);
+    setNotifications([]);
+    setToken(null);
     localStorage.removeItem("accessToken");
   }, []);
   const connectSocket = useCallback(() => {
@@ -125,6 +135,44 @@ export const UserProvider = ({ children }) => {
     }
   }, []);
 
+  const fetchNotify = useCallback(async (admin) => {
+    try {
+      let res;
+      if (admin) {
+        res = await axiosInstance.get(API_PATHS.NOTIFY.GET_ALL_NOTIFY_ADMIN);
+      } else {
+        res = await axiosInstance.get(API_PATHS.NOTIFY.GET_ALL_NOTIFY);
+      }
+      return res.data.notifications || [];
+    } catch (error) {
+      console.error("fetchNotify error:", error?.message || error);
+      return [];
+    }
+  }, []);
+  const fetchAppointment = useCallback(async (roomId) => {
+    try {
+      const { data } = await axiosInstance.get(
+        API_PATHS.APPOINTMENTS.GET_APPOINTMENTS_BY_ROOMID(roomId)
+      );
+      return data.appointments || [];
+    } catch (error) {
+      console.error("fetchAssignment error:", error?.message || error);
+      return [];
+    }
+  }, []);
+
+  const fetchSession = useCallback(async (appointmentId) => {
+    try {
+      const { data } = await axiosInstance.get(
+        API_PATHS.SESSIONS.GET_SESSIONS_BY_APPOINTMENT_ID(appointmentId)
+      );
+      return data.sessions || [];
+    } catch (error) {
+      console.error("fetchSession error:", error?.message || error);
+      return [];
+    }
+  }, []);
+
   const fetchRoom = useCallback(async () => {
     try {
       const { data } = await axiosInstance.get(API_PATHS.ROOMS.GET_ROOM);
@@ -136,6 +184,7 @@ export const UserProvider = ({ children }) => {
   const fetchRooms = useCallback(async () => {
     const allRooms = await fetchRoom();
     setRooms(allRooms);
+    return allRooms;
   });
   const fetchMessages = useCallback(async (roomId) => {
     try {
@@ -147,7 +196,19 @@ export const UserProvider = ({ children }) => {
       console.error("fetch Message error:", error?.message || error);
     }
   }, []);
-
+  const fetchHomeWorkSubmissions = useCallback(async (assignmentId) => {
+    try {
+      const { data } = await axiosInstance.get(
+        API_PATHS.HOMEWORK_SUBMISSIONS.GET_HOMEWORK_SUBMISSION_BY_ID(
+          assignmentId
+        )
+      );
+      return data.homeworkSubmission || [];
+    } catch (error) {
+      console.error("fetch Message error:", error?.message || error);
+      return [];
+    }
+  }, []);
   const sendMessage = useCallback(async ({ roomId, content }) => {
     try {
       const { data } = await axiosInstance.post(
@@ -186,12 +247,12 @@ export const UserProvider = ({ children }) => {
   }, [socket]);
 
   const fetchUser = useCallback(async () => {
-    console.log(token);
-    if (!token) {
-      clearUser();
-      setLoading(false);
-      return;
-    }
+    // console.log(token);
+    // if (!token) {
+    //   clearUser();
+    //   setLoading(false);
+    //   return;
+    // }
 
     // Đọc account trong localStorage an toàn
     let localAccount = null;
@@ -223,19 +284,47 @@ export const UserProvider = ({ children }) => {
       const accountRole = dataUser?.accountId?.role || dataUser?.role;
 
       // ----- USER -----
-      if (accountRole === "user") {
+      if (accountRole === "user" && dataUser.testHistory.length > 0) {
         setDoctors(dataUser.doctorIds || []);
         setCurrentDoctor(dataUser.currentDoctorId || null);
         const r = await fetchRoom();
         console.log(r[0]);
         setRoom(r[0]);
+
+        const ap = await fetchAppointment(r[0]._id);
+        console.log(ap);
+        setAppointments(ap);
+
+        if (ap.length > 0) {
+          const allSessions = await Promise.all(
+            ap.map((u) => fetchSession(u._id))
+          );
+          setSessions(allSessions.flatMap((arr) => arr || []));
+        } else {
+          setSessions([]);
+        }
+
+        const no = await fetchNotify(false);
+        console.log(no);
+        setNotifications(no);
+
         const hw = await fetchAssignment(dataUser._id);
         setAssignments(hw);
+        if (hw.length > 0) {
+          const allSubmissions = await Promise.all(
+            hw.map((u) => fetchHomeWorkSubmissions(u._id))
+          );
+          setHomeworkSubmissions(allSubmissions.flatMap((arr) => arr || []));
+          console.log(allSubmissions.flatMap((arr) => arr || []));
+        } else {
+          setHomeworkSubmissions([]);
+        }
+
         await fetchMessages(r[0]._id);
       }
 
       // ----- DOCTOR -----
-      if (accountRole === "doctor") {
+      if (accountRole === "doctor" && dataUser.approval.status === "approved") {
         const { data } = await axiosInstance.get(
           API_PATHS.USERS.GET_USERS_BY_DOCTORID
         );
@@ -243,11 +332,52 @@ export const UserProvider = ({ children }) => {
         setPatients(resPatients);
 
         if (resPatients.length > 0) {
-          const allAssignments = await Promise.all(
-            resPatients.map((u) => fetchAssignment(u._id))
+          // 1. Lấy tất cả bài tập của tất cả bệnh nhân
+          const allAssignmentsByPatient = await Promise.all(
+            resPatients.map((u) => fetchAssignment(u._id)) // mỗi u trả về mảng bài tập
           );
-          setAssignments(allAssignments.flat());
-          await fetchRooms();
+
+          // flat thành một mảng assignment duy nhất
+          const flatAssignments = allAssignmentsByPatient
+            .flat()
+            .filter(Boolean);
+
+          setAssignments(flatAssignments);
+
+          // 2. Lấy tất cả bài nộp theo từng bài tập
+          if (flatAssignments.length > 0) {
+            const allSubmissions = await Promise.all(
+              flatAssignments.map((a) => fetchHomeWorkSubmissions(a._id)) // 🔹 theo assignmentId
+            );
+
+            const mergedSubmissions = allSubmissions.flatMap(
+              (arr) => arr || []
+            );
+
+            setHomeworkSubmissions(mergedSubmissions);
+            console.log(mergedSubmissions);
+          } else {
+            setHomeworkSubmissions([]);
+          }
+
+          const no = await fetchNotify(false);
+          console.log(no);
+          setNotifications(no);
+
+          const dataRooms = await fetchRooms();
+          const allAppointments = await Promise.all(
+            dataRooms.map((u) => fetchAppointment(u._id))
+          );
+          const allAppointmentsData = allAppointments.flat();
+          setAppointments(allAppointmentsData);
+          if (allAppointmentsData.length > 0) {
+            const allSessions = await Promise.all(
+              allAppointmentsData.map((u) => fetchSession(u._id))
+            );
+            setSessions(allSessions.flatMap((arr) => arr || []));
+          } else {
+            setSessions([]);
+          }
         } else {
           setAssignments([]);
         }
@@ -265,6 +395,16 @@ export const UserProvider = ({ children }) => {
         const resTransactions = responseTransaction.data?.transactions || [];
         setTransactions(resTransactions);
         console.log("data resTransactions: ", resTransactions);
+
+        const responseUsersSwitch = await axiosInstance.get(
+          API_PATHS.USERS.GET_USERS_SWITCH_DOCTOR
+        );
+        const resUsersSwitch = responseUsersSwitch.data?.users || [];
+        setUserSwitchs(resUsersSwitch);
+
+        const no = await fetchNotify(true);
+        console.log(no);
+        setNotifications(no);
 
         const { data } = await axiosInstance.get(
           API_PATHS.DOCTORS.GET_ALL_DOCTORS
@@ -284,6 +424,7 @@ export const UserProvider = ({ children }) => {
 
   // ---------- Effect khởi tạo ----------
   useEffect(() => {
+    console.log(token);
     if (!token) {
       clearUser();
       setLoading(false);
@@ -319,9 +460,24 @@ export const UserProvider = ({ children }) => {
       onlineUsers,
       unSubcribeToMessages,
       subcribeToMessages,
+      userSwitchs,
+      setToken,
+      setUser,
+      setMessages,
+      homeworkSubmissions,
+      appointments,
+      setUserSwitchs,
+      setHomeworkSubmissions,
+      setAssignments,
+      notifications,
+      setNotifications,
+      sessions,
+      setSessions,
+      setPatients,
     }),
     [
       user,
+      setToken,
       messages,
       fetchUser,
       doctors,
@@ -344,6 +500,19 @@ export const UserProvider = ({ children }) => {
       onlineUsers,
       unSubcribeToMessages,
       subcribeToMessages,
+      userSwitchs,
+      setUser,
+      setMessages,
+      homeworkSubmissions,
+      appointments,
+      setUserSwitchs,
+      setHomeworkSubmissions,
+      setAssignments,
+      notifications,
+      setNotifications,
+      sessions,
+      setSessions,
+      setPatients,
     ]
   );
 

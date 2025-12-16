@@ -15,10 +15,14 @@ import transactionRoutes from "./routes/transactionRoutes.js";
 import testResultRoutes from "./routes/testResultRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
 import homeworkAssignmentRoutes from "./routes/homeworkAssignmentRoutes.js";
+import homeworkSubmissionRoutes from "./routes/homeworkSubmissionRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import notifyRoutes from "./routes/notifyRoutes.js";
+import sessionRoutes from "./routes/sessionRoutes.js";
 import { app, server } from "./config/socket.js";
-
+import "./cron/autoCompleteAppointment.js";
+import "./cron/autoNotifyAppointment.js";
 dotenv.config();
 // Middleware to handle CORS
 app.use(
@@ -51,12 +55,14 @@ app.use("/api/transactions", transactionRoutes);
 app.use("/api/testresult", testResultRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/homework-assignments", homeworkAssignmentRoutes);
+app.use("/api/homework-submissions", homeworkSubmissionRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/notify", notifyRoutes);
+app.use("/api/sessions", sessionRoutes);
 
 //Start Server
 const PORT = process.env.PORT || 8080;
-
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port: ${PORT} `);
 });

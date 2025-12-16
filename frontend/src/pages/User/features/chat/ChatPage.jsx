@@ -7,8 +7,8 @@ import { useUserContext } from "../../../../context/userContext";
 export default function ChatPage({
   room,
   doctor,
-  setUnreadChat,
   messages,
+  setMessages,
   onSend,
   onComplete, // optional: callback khi đánh dấu hoàn thành
   onSendComplete, // optional: callback gửi yêu cầu hoàn thành tới bác sĩ/backend
@@ -55,27 +55,27 @@ export default function ChatPage({
     );
     if (!ok) return;
 
-    // 1) Ẩn nút
-    setCompleted(true);
-
-    // 2) Thêm system message để cả hai phía đều thấy lịch sử yêu cầu
-    const sysMsg = {
-      id: Math.random().toString(36).slice(2),
-      from: "system",
-      text: "Bạn đã đánh dấu HOÀN THÀNH khóa điều trị. Yêu cầu đã được gửi tới bác sĩ.",
-      time: new Date().toISOString(),
-    };
-    // setMessages((prev) => [...prev, sysMsg]);
-
     // 3) Gửi callback lên parent/backend nếu cần
     try {
+      // 1) Ẩn nút
+      setCompleted(true);
+
+      // 2) Thêm system message để cả hai phía đều thấy lịch sử yêu cầu
+      const sysMsg = {
+        id: Math.random().toString(36).slice(2),
+        senderType: "system",
+        content:
+          "Bạn đã đánh dấu HOÀN THÀNH khóa điều trị. Yêu cầu đã được gửi tới bác sĩ.",
+        createdAt: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, sysMsg]);
       await onSendComplete?.({
         doctorId: doctor?.id,
         at: new Date().toISOString(),
         type: "chat_completed_request",
       });
       // thông báo badge/unread cho phía bác sĩ (tuỳ ý)
-      setUnreadChat?.((c) => (typeof c === "number" ? c + 1 : c));
     } catch (e) {
       // Nếu lỗi gửi backend, vẫn giữ trạng thái completed & message
       console.error("Send complete request failed:", e);
