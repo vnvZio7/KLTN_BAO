@@ -2,14 +2,11 @@ import axios from "axios";
 import Transaction from "../models/transaction.model.js";
 const getDataSePay = async (req, res) => {
   try {
-    const { data } = await axios.get(
-      "https://my.sepay.vn/userapi/bankaccounts/details/26008",
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.API_TOKEN}`,
-        },
-      }
-    );
+    const { data } = await axios.get(process.env.PROFILE_SEPAY, {
+      headers: {
+        Authorization: `Bearer ${process.env.API_TOKEN}`,
+      },
+    });
     res.json({ success: true, bankaccount: data.bankaccount });
 
     // res.json(bookings);
