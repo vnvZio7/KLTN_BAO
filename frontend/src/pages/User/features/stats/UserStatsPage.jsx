@@ -100,31 +100,41 @@ function classifyGAD7(score) {
   return { label: "Nặng", tone: "text-rose-600" };
 }
 
-export default function UserStatsPage({ appointments = [], messages = [] }) {
+export default function UserStatsPage({
+  appointments = [],
+  assignments,
+  submissions,
+  sessions,
+  messages = [],
+  user,
+}) {
   const stats = MOCK_STATS;
-
-  const doneTasks = stats.tasksDone;
-  const totalTasks = stats.tasksTotal;
+  console.log(submissions);
+  const doneTasks = submissions.length;
+  const totalTasks = assignments.length;
   const adherence = Math.round((doneTasks / Math.max(totalTasks, 1)) * 100);
 
   // derive KPIs from inputs
-  const sessionsCompleted = stats.sessionsCompleted;
+  const sessionsCompleted = sessions.length;
   const upcomingSessions = stats.upcomingSessions;
   const totalMessages = messages.length;
 
   // Lấy điểm test gần nhất từ mảng phq9, gad7
-  const lastPhqScore =
-    Array.isArray(stats.phq9) && stats.phq9.length > 0
-      ? stats.phq9[stats.phq9.length - 1]
-      : null;
-  const lastGadScore =
-    Array.isArray(stats.gad7) && stats.gad7.length > 0
-      ? stats.gad7[stats.gad7.length - 1]
-      : null;
+  const lastPhqScore = user.lastPHQ9Score;
+  const lastGadScore = user.lastGAD7Score;
 
   const phqInfo = classifyPHQ9(lastPhqScore);
   const gadInfo = classifyGAD7(lastGadScore);
 
+  const phq = (user.testHistory || [])
+    .filter((t) => t?.code === "PHQ-9")
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  const gad = (user.testHistory || [])
+    .filter((t) => t?.code === "GAD-7")
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  console.log(phq, gad);
   return (
     <div className="space-y-6">
       <section className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between">
@@ -170,11 +180,11 @@ export default function UserStatsPage({ appointments = [], messages = [] }) {
           <div className="grid sm:grid-cols-2 gap-4 items-center">
             <div>
               <div className="text-sm text-slate-600 mb-1">PHQ-9</div>
-              <SimpleLineChart points={stats.phq9 || []} />
+              <SimpleLineChart points={phq.map((e) => e.totalScore) || []} />
             </div>
             <div>
               <div className="text-sm text-slate-600 mb-1">GAD-7</div>
-              <SimpleLineChart points={stats.gad7 || []} />
+              <SimpleLineChart points={gad.map((e) => e.totalScore) || []} />
             </div>
           </div>
         </div>

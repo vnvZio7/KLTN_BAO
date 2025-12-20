@@ -11,7 +11,12 @@ const doctorSchema = new mongoose.Schema({
     enum: ["counselor", "therapist", "psychiatrist"],
     required: true,
   },
-  walletBalance: { type: Number, default: 0 }, // so du
+  walletBalance: [
+    {
+      amount: { type: Number, default: 0 },
+      createdAt: { type: Date, default: Date.now },
+    },
+  ],
   specializations: [{ type: String }], // ["trầm cảm","lo âu","mất ngủ","hôn nhân", ...]
   modalities: [{ type: String }], // ["CBT","ACT","Mindfulness","Family","Trauma-focused"]
   yearsExperience: Number,

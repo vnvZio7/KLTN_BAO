@@ -146,11 +146,6 @@ export const methodTheme = {
     text: "text-teal-700",
     Icon: UsersRound,
   },
-  "Biofeedback / Neurofeedback": {
-    ring: "from-lime-400 to-green-400",
-    text: "text-lime-700",
-    Icon: ActivitySquare,
-  },
   Relaxation: {
     ring: "from-indigo-400 to-cyan-400",
     text: "text-indigo-700",
@@ -245,7 +240,7 @@ function Confetti({ show, onDone }) {
   );
 }
 
-// ====== Modal làm bài (thêm feedbackDoctor) ======
+// ====== Modal làm bài ( ) ======
 function AssignmentModal({ open, onClose, item, onSubmit }) {
   const [step, setStep] = useState("pre"); // pre -> work -> post
   const [moodBefore, setMoodBefore] = useState(5);
@@ -253,7 +248,6 @@ function AssignmentModal({ open, onClose, item, onSubmit }) {
   const [selfRating, setSelfRating] = useState(4);
   const [answersText, setAnswersText] = useState("");
   const [files, setFiles] = useState([]);
-  const [feedbackDoctor, setFeedbackDoctor] = useState(""); // 👈 feedback gửi bác sĩ
 
   useEffect(() => {
     if (!open) {
@@ -263,7 +257,6 @@ function AssignmentModal({ open, onClose, item, onSubmit }) {
       setSelfRating(4);
       setAnswersText("");
       setFiles([]);
-      setFeedbackDoctor("");
     }
   }, [open]);
 
@@ -409,7 +402,7 @@ function AssignmentModal({ open, onClose, item, onSubmit }) {
             </div>
           )}
 
-          {/* Post-step (moodAfter + rating + feedbackDoctor) */}
+          {/* Post-step (moodAfter + rating  ) */}
           {step === "post" && (
             <div className="mt-4 space-y-4">
               <div className="rounded-xl border border-slate-200 p-3">
@@ -436,18 +429,6 @@ function AssignmentModal({ open, onClose, item, onSubmit }) {
                 <StarRating value={selfRating} onChange={setSelfRating} />
               </div>
 
-              <div className="rounded-xl border border-slate-200 p-3">
-                <div className="mb-1 text-sm font-medium text-slate-700">
-                  Bạn muốn gửi lời nhắn/feedback gì cho bác sĩ?
-                </div>
-                <textarea
-                  value={feedbackDoctor}
-                  onChange={(e) => setFeedbackDoctor(e.target.value)}
-                  className="w-full min-h-[80px] rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                  placeholder="Ví dụ: Bài tập này giúp em bình tĩnh hơn vào buổi tối, nhưng đoạn X em thấy hơi khó..."
-                />
-              </div>
-
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => setStep("work")}
@@ -462,7 +443,6 @@ function AssignmentModal({ open, onClose, item, onSubmit }) {
                       answers: answersText || "",
                       moodBefore,
                       moodAfter,
-                      feedbackDoctor,
                       attachments: files,
                     };
                     console.log(payload);
@@ -536,14 +516,13 @@ export default function UserHomeworkPage({
     });
   }, [items, submissions]);
 
-  // submit bài (gửi feedbackDoctor luôn)
+  // submit bài (gửi  luôn)
   const handleSubmit = async ({
     assignmentId,
     answers,
     moodBefore,
     moodAfter,
     attachments,
-    feedbackDoctor,
   }) => {
     try {
       const payload = {
@@ -551,7 +530,6 @@ export default function UserHomeworkPage({
         answers,
         moodBefore,
         moodAfter,
-        feedbackDoctor,
       };
 
       const formData = new FormData();
@@ -635,7 +613,6 @@ export default function UserHomeworkPage({
                 <li>
                   Nhớ đánh giá <b>tâm trạng trước–sau</b> và{" "}
                   <b>mức độ hiệu quả</b>, cũng như gửi{" "}
-                  <b>feedback cho bác sĩ</b> nếu cần.
                 </li>
               </ul>
             </div>
@@ -763,16 +740,7 @@ export default function UserHomeworkPage({
                               </p>
                             </div>
                           )}
-                          {lastSub.feedbackDoctor && (
-                            <div className="mt-2">
-                              <div className="font-medium mb-0.5">
-                                Feedback gửi bác sĩ
-                              </div>
-                              <p className="whitespace-pre-line">
-                                {lastSub.feedbackDoctor}
-                              </p>
-                            </div>
-                          )}
+
                           {lastSub.attachments?.length > 0 && (
                             <div className="mt-1">
                               <div className="font-medium mb-0.5">

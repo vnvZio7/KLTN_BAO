@@ -61,4 +61,48 @@ const createRoom = async (req, res) => {
   }
 };
 
+// const updateRoom = async (req, res) => {
+//   try {
+//     const { status, roomId } = req.body;
+//     if (status === "pause") {
+//       await createNotification({
+//       sendId: req.user._id,
+//       title1: "Yêu cầu hoàn thành điều trị",
+//       message:
+//         `${req.account.role === "user" ? "Bệnh nhân "+ req.account.fullName: "Bác sĩ" } vừa gửi yêu cầu hoàn thành điều trị. Hãy kiểm tra trong tin nhắn`,
+//       type: "system",
+//     });
+//     } else if (status === "complete") {
+
+//     }
+// const room = await Room.create({
+//   userId: req.user._id,
+//   doctorId: req.body.doctorId,
+// });
+//     const room = await Room.findByIdAndUpdate(roomId, {
+//         status,
+//       });
+//     await createNotification({
+//       userId: req.user._id,
+//       title1: "Kết nối thành công tới bác sĩ",
+//       message:
+//         "Hệ thống đã kết nối thành công bạn với bác sĩ. Xem chi tiết ở trang thông tin bác sĩ",
+//       type: "system",
+//     });
+//     await createNotification({
+//       doctorId: req.body.doctorId,
+//       title1: "Bệnh nhân mới",
+//       message: `Bạn vừa được ghép nối với một bệnh nhân - ${req.account.fullName}`,
+//       type: "system",
+//     });
+
+//     res.status(201).json({ message: "Đã cập nhật room thành công!", room });
+//   } catch (err) {
+//     return res.status(500).json({
+//       message: "Lỗi server khi cập nhật room",
+//       error: err.message,
+//     });
+//   }
+// };
+
 export { getRooms, getRoom, createRoom };

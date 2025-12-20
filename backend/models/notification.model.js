@@ -25,6 +25,7 @@ const notificationSchema = new mongoose.Schema(
         "system", // thông báo hệ thống chung
         "homework", // thông báo BTVN
         "call", // thông báo BTVN
+        "test",
       ],
       default: "system",
     },

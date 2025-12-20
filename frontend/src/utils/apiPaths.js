@@ -16,6 +16,7 @@ export const API_PATHS = {
     GET_USERS_SWITCH_DOCTOR: "/api/users/switch-doctor",
     UPDATE_SWITCH_DOCTOR: `/api/users/update`,
     UPDATE_FREE_CALL: `/api/users/free-call`,
+    ADD_NOTE: `/api/users/add-note`,
     UPDATE_RETEST: (id) => `/api/users/retest/${id}`,
   },
   ADMIN: {

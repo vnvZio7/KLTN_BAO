@@ -94,7 +94,6 @@ export default function Page() {
       setOpen(true); // 👉 mở modal
     }
   }, [active]);
-
   const unreadNotif = useMemo(
     () => notifications.filter((n) => !n.read).length,
     [notifications]
@@ -112,7 +111,11 @@ export default function Page() {
       {active === "stats" && (
         <UserStatsPage
           appointments={appointments}
-          messages={[]} // truyền dữ liệu thực nếu có
+          assignments={assignments}
+          submissions={homeworkSubmissions}
+          messages={messages} // truyền dữ liệu thực nếu có
+          sessions={sessions}
+          user={user}
         />
       )}
       {active === "billing" && <PaymentPage />}
@@ -223,6 +226,7 @@ export default function Page() {
         <NotificationsPage
           notifications={notifications}
           setNotifications={setNotifications}
+          user={user}
         />
       )}
       {active === "profile" && <ProfilePage user={user} />}

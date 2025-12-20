@@ -6,7 +6,7 @@ import doctorModel from "../models/doctor.model.js";
 
 const getSessions = async (req, res) => {
   try {
-    const sessions = await Session.find();
+    const sessions = await Session.find().populate("appointmentId");
     const data = sessions.map((e) => e);
     res.json(data);
     // res.json(sessions);
@@ -83,7 +83,14 @@ const getSessionsThisWeek = async (req, res) => {
 
 const getSessionByAppointmentId = async (req, res) => {
   try {
-    const sessions = await Session.find({ appointmentId: req.params.id });
+    const sessions = await Session.find({
+      appointmentId: req.params.id,
+    }).populate({
+      path: "appointmentId",
+      populate: {
+        path: "roomId",
+      },
+    });
     if (!sessions)
       return res.status(404).json({ message: "Không tìm thấy bài session" });
     res.json({ sessions });
@@ -126,8 +133,14 @@ const createSession = async (req, res) => {
         const doctor = await doctorModel.findByIdAndUpdate(
           user.currentDoctorId,
           {
-            $set: { walletBalance: user.currentDoctorId.pricePerWeek },
-          }
+            $push: {
+              walletBalance: {
+                amount: user.currentDoctorId.pricePerWeek,
+                createdAt: new Date(),
+              },
+            },
+          },
+          { new: true }
         );
         console.log(doctor);
         user.walletBalance = pill;
