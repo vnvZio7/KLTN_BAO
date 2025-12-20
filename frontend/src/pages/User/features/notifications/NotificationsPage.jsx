@@ -2,10 +2,16 @@ import React, { useMemo, useState } from "react";
 import axiosInstance from "../../../../utils/axiosInstance";
 import { API_PATHS } from "../../../../utils/apiPaths";
 import { dateFormat, prettyTime } from "../../../../utils/helper";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRightIcon, ChevronRightIcon, MoveRightIcon } from "lucide-react";
 
-export default function NotificationsPage({ notifications, setNotifications }) {
+export default function NotificationsPage({
+  notifications,
+  setNotifications,
+  user,
+}) {
   const [filter, setFilter] = useState("all");
-
+  const navigate = useNavigate();
   const filtered = useMemo(() => {
     return notifications.filter((n) =>
       filter === "all" ? true : n.type === filter
@@ -77,8 +83,21 @@ export default function NotificationsPage({ notifications, setNotifications }) {
                   {prettyTime(n.createdAt)}
                 </div>
               </div>
-              <div className="text-slate-700 mt-1 text-sm">{n.message}</div>
-              {!n.read && (
+              <div className="flex justify-between items-center">
+                <div className="text-slate-700 mt-1 text-sm">{n.message}</div>
+                {n.type === "test" && user.retest === true && (
+                  <button
+                    onClick={async () => {
+                      markOne(n._id);
+                      navigate("/retest");
+                    }}
+                    className="bg-blue-700 px-3 py-1 text-white border-white rounded-2xl hover:bg-blue-600 text-sm flex items-center justify-center"
+                  >
+                    <span>Bắt đầu làm</span>
+                  </button>
+                )}
+              </div>
+              {!n.read && n.type !== "test" && (
                 <button
                   onClick={() => markOne(n._id)}
                   className="mt-2 text-xs px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-50"

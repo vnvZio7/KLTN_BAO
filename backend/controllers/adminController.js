@@ -98,7 +98,7 @@ const updateApproval = async (req, res) => {
       }
 
       await Doctor.findByIdAndDelete(id);
-
+      await Account.findByIdAndDelete(doctorData.accountId);
       sendMail({
         to: email,
         subject: "Pomera: Kết quả xét duyệt hồ sơ bác sĩ",

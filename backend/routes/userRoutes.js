@@ -7,8 +7,9 @@ import {
   getUsersSwitchDoctor,
   updateSwitchDoctorId,
   updateRetest,
-  updateUserBeforeReTest,
+  updateUserAfterReTest,
   updateFreeCallUser,
+  addNote,
 } from "../controllers/userController.js";
 
 const router = express.Router();
@@ -19,8 +20,9 @@ router.get("/switch-doctor", getUsersSwitchDoctor);
 router.get("/doctor", protect, getUserByDoctorId);
 router.patch("/", protect, updateUser);
 router.patch("/update", protect, updateSwitchDoctorId);
-router.patch("/retest/", protect, updateUserBeforeReTest);
+router.patch("/retest/", protect, updateUserAfterReTest);
 router.patch("/retest/:id", protect, updateRetest);
 router.patch("/free-call", protect, updateFreeCallUser);
+router.post("/add-note", protect, addNote);
 
 export default router;

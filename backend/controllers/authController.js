@@ -160,6 +160,7 @@ const getUserProfile = async (req, res) => {
     if (req.account.role === "user") {
       user = await User.findOne({ _id: req.user._id })
         .populate("accountId")
+        .populate("testHistory")
         // populate mảng doctorIds, rồi populate tiếp accountId bên trong Doctor
         .populate({
           path: "doctorIds",

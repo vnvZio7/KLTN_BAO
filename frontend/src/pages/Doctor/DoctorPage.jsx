@@ -65,6 +65,39 @@ import SessionDetailPopup from "../../components/SessionDetailPopup";
  */
 
 // ------------------------------ Helpers ------------------------------
+
+// month: 1-12
+function calcWalletTotalByMonth(doctor, year, month) {
+  const list = doctor?.walletBalance ?? [];
+  const y = Number(year);
+  const m = Number(month) + 1;
+
+  let total = 0;
+
+  list.map((item) => {
+    {
+      if (!item) return;
+
+      const d = new Date(item.createdAt);
+      if (Number.isNaN(d.getTime())) return;
+
+      const itemYear = d.getFullYear();
+      const itemMonth = d.getMonth() + 1;
+
+      if (itemYear === y && itemMonth === m) {
+        const amt = Number(item.amount ?? 0);
+        if (Number.isFinite(amt)) total += amt;
+      }
+    }
+  });
+
+  return total;
+}
+function calcWalletTotalLastMonth(doctor, now = new Date()) {
+  const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const m = now.getMonth() === 0 ? 12 : now.getMonth(); // vì getMonth() là 0-11, tháng trước sẽ là 1-12
+  return calcWalletTotalByMonth(doctor, y, m);
+}
 const fmtDate = (d) =>
   new Intl.DateTimeFormat("vi-VN", {
     dateStyle: "medium",
@@ -229,7 +262,7 @@ export default function DoctorPage() {
     notifications,
     setNotifications,
   } = useUserContext();
-
+  console.log(user);
   const [mode, setMode] = useState("template"); // "template" | "custom"
   const [templateSearch, setTemplateSearch] = useState("");
 
@@ -268,14 +301,12 @@ export default function DoctorPage() {
   // Derived stats
   const stats = useMemo(() => {
     const total = patients.length;
-    const activeChats = patients.filter((p) => (p.unread || 0) > 0).length;
-    const upcomingToday = appointments.filter((c) =>
-      withinSameDay(c.startTime)
-    ).length;
-    const pendingReq = appointments.filter(
-      (r) => r.status === "pending"
-    ).length;
-    const homeworkDueToday = currencyVND();
+    const activeChats = patients.filter((p) => (!p.read || 0) > 0).length;
+    const upcomingToday = appointments.filter((c) => {
+      if (c.status === "cancelled") return;
+      return withinSameDay(c.startTime);
+    }).length;
+    const totalMonth = currencyVND(calcWalletTotalLastMonth(user));
     // patients.reduce(
     //   (acc, p) =>
     //     acc +
@@ -284,7 +315,7 @@ export default function DoctorPage() {
     //     ).length,
     //   0
     // );
-    return { total, activeChats, upcomingToday, pendingReq, homeworkDueToday };
+    return { total, activeChats, upcomingToday, totalMonth };
   }, [patients, appointments]);
 
   // ---------------------- Actions (mocked) ----------------------
@@ -308,7 +339,7 @@ export default function DoctorPage() {
       if (res.data.success) {
         toast.success(res.data.message);
       }
-      return true;
+      return { check: true, appointment: res.data.appointment };
     } catch (error) {
       toast.error(error.response.data.message);
     }
@@ -638,6 +669,7 @@ export default function DoctorPage() {
             rooms={rooms}
             calls={appointments}
             setNav={setNav}
+            sessions={sessions}
             setActivePatientId={setActivePatientId}
             setOpenCall={setOpenCall}
             setCallRoomId={setCallRoomId}
@@ -695,9 +727,10 @@ export default function DoctorPage() {
         {nav === "notifications" && (
           <NotificationsView
             notifications={notifications}
-            onMarkAll={() =>
-              setNotifications((ns) => ns.map((n) => ({ ...n, read: true })))
-            }
+            onMarkAll={async () => {
+              await axiosInstance.patch(API_PATHS.NOTIFY.UPDATE_MARK_ALL_READ);
+              setNotifications((ns) => ns.map((n) => ({ ...n, read: true })));
+            }}
           />
         )}
 
@@ -777,7 +810,6 @@ export default function DoctorPage() {
                       res.data.homeworkAssignment ||
                       res.data.data?.homeworkAssignment ||
                       res.homeworkAssignment;
-                    console.log(newAssignment);
                     // 🚀 Thêm vào danh sách assignments trong UI
                     setAssignments((prev) => [...prev, newAssignment]);
                     toast.success("Giao bài tập thành công");
@@ -1208,6 +1240,7 @@ function Dashboard({
   rooms,
   calls,
   setNav,
+  sessions,
   setActivePatientId,
   setOpenCall,
   setCallRoomId,
@@ -1225,6 +1258,7 @@ function Dashboard({
 
     return calls
       .filter((call) => {
+        if (call.status === "cancelled") return;
         const t = new Date(call.startTime);
         // chỉ lấy cuộc gọi trong ngày hôm nay
         return t >= startOfDay && t <= endOfDay;
@@ -1309,8 +1343,9 @@ function Dashboard({
         <StatCard
           icon={ClipboardList}
           label="Doanh thu tháng"
-          value={stats.homeworkDueToday}
-          hint={"Tháng " + new Date().getMonth()}
+          value={stats.totalMonth}
+          hint={"Tháng " + (new Date().getMonth() + 1)}
+          // hint={"Tháng " + new Date().getMonth()}
         />
       </div>
 
@@ -1342,8 +1377,12 @@ function Dashboard({
               const endMs = end.getTime();
 
               const status = c.status;
+              const session =
+                sessions.find(
+                  (e) => e?.appointmentId?.toString() === c?._id?.toString()
+                ) || null;
               const isCompleted =
-                status === "completed" || status === "complete";
+                (status === "completed" || status === "complete") && session;
               const isPast = nowMs > endMs;
               const isSoon = nowMs < startMs - fifteenMs; // giống CalendarCell
 
@@ -1410,10 +1449,18 @@ function Dashboard({
           `}
                       disabled={!canJoin && !isCompleted}
                       onClick={() => {
-                        if (!canJoin) return;
-                        console.log(c);
-                        setOpenCall(true);
-                        setCallRoomId(c._id);
+                        if (btnLabel === "Xem chi tiết" && isCompleted) {
+                          setSessionData(session);
+                          setOpenCallDetails(true);
+                        }
+                        if (
+                          canJoin &&
+                          btnLabel === "Vào phòng" &&
+                          !isCompleted
+                        ) {
+                          setOpenCall(true);
+                          setCallRoomId(call._id);
+                        }
                       }}
                     >
                       {btnLabel}
@@ -1514,7 +1561,7 @@ function Dashboard({
                   <div>
                     <Progress
                       value={p.testHistory.at(-2).totalScore}
-                      max={27}
+                      max={21}
                       label="PHQ-9"
                     />
                     <div
@@ -1574,16 +1621,33 @@ function PatientsView({
   activePatientId = patients[0]?._id || null,
   setPatients,
 }) {
-  const ap = useMemo(
-    () =>
-      patients.find((p) => p._id === activePatientId) || patients[0] || null,
-    [patients, activePatientId]
+  const [notes, setNotes] = useState(
+    patients[0].notes.sort((a, b) => {
+      const ta = new Date(a?.createdAt ?? 0).getTime();
+      const tb = new Date(b?.createdAt ?? 0).getTime();
+      return tb - ta;
+    }) || []
   );
+  const [note, setNote] = useState("");
+  const ap = useMemo(() => {
+    const user =
+      patients.find((p) => p._id === activePatientId) || patients[0] || null;
+    setNotes(
+      user.notes.sort((a, b) => {
+        const ta = new Date(a?.createdAt ?? 0).getTime();
+        const tb = new Date(b?.createdAt ?? 0).getTime();
+        return tb - ta;
+      })
+    );
+    return user;
+  }, [patients, activePatientId]);
+  console.log(ap);
 
   const ass = useMemo(
     () => assignments.filter((p) => p.userId === activePatientId),
     [assignments, activePatientId]
   );
+
   // Dropdown chọn bệnh nhân (phải ngoài cùng) + tìm kiếm bên trong
 
   // --- Modal trạng thái cho phần Bài tập ---
@@ -1763,20 +1827,59 @@ function PatientsView({
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-semibold">Ghi chú</h3>
               <Badge tone="default">
-                Phiên gần nhất: {ap.nextCall ? fmtDate(ap.nextCall) : "—"}
+                Phiên gần nhất:{" "}
+                {ap.notes?.[0]?.createdAt
+                  ? prettyTime(ap.notes?.[0]?.createdAt)
+                  : "—"}
               </Badge>
             </div>
-            <textarea
-              className="h-28 w-full resize-none rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-zinc-400"
-              defaultValue={ap.notes}
-              // onBlur={(e) =>
-              //   setPatients((ps) =>
-              //     ps.map((p) =>
-              //       p._id === ap.id ? { ...p, notes: e.target.value } : p
-              //     )
-              //   )
-              // }
-            />
+            <div className="relative ">
+              <textarea
+                className="h-28 w-full resize-none rounded-xl border border-zinc-200 p-3 text-sm outline-none focus:border-zinc-400"
+                // defaultValue={""}
+                onBlur={(e) => setNote(e.target.value)}
+              ></textarea>
+              <button
+                onClick={async () => {
+                  await axiosInstance.post(API_PATHS.USERS.ADD_NOTE, {
+                    userId: ap._id,
+                    content: note,
+                  });
+                  setNote("");
+                  setNotes((prev) => [
+                    {
+                      content: note,
+                      createdAt: Date.now(),
+                    },
+                    ...prev,
+                  ]);
+                }}
+                className="absolute right-1 bottom-3 border-gray-500 border-2 rounded-xl px-2 py-1 hover:bg-gray-300 bg-gray-200 cursor-pointer"
+              >
+                Cập nhật
+              </button>
+            </div>{" "}
+            <div className="space-y-2 overflow-y-scroll max-h-[210px] border-gray-500 border-1 rounded">
+              {notes.map((n, idx) => {
+                const key = n?._id || `${n?.createdAt}-${idx}`;
+                return (
+                  <div
+                    key={key}
+                    className="m-2 rounded-xl border border-zinc-200 p-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs text-zinc-500">
+                        {prettyTime(n?.createdAt)}
+                      </div>
+                    </div>
+
+                    <div className="mt-1 whitespace-pre-wrap text-sm text-zinc-800">
+                      {n?.content || "—"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -1941,6 +2044,7 @@ function TestHistoryChart({ history = [] }) {
     .filter((t) => t?.code === "GAD-7")
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
+  console.log(phq, gad);
   if (!phq.length && !gad.length) {
     return (
       <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-500">
@@ -1974,7 +2078,7 @@ function TestHistoryChart({ history = [] }) {
       .join(" ");
   };
 
-  const phqPath = buildPath(phq, 27);
+  const phqPath = buildPath(phq, 21);
   const gadPath = buildPath(gad, 21);
 
   const buildDots = (points, maxScore) =>
@@ -1991,12 +2095,12 @@ function TestHistoryChart({ history = [] }) {
       return { x, y, score: p.totalScore };
     });
 
-  const phqDots = buildDots(phq, 27);
+  const phqDots = buildDots(phq, 21);
   const gadDots = buildDots(gad, 21);
 
   return (
     <div className="md:col-span-1 rounded-2xl border bg-white p-4">
-      <div className="mb-2 flex items-center justify-between text-xs text-zinc-600">
+      <div className="mt-2 mb-2 flex items-center justify-between text-xs text-zinc-600">
         <span>Diễn biến mức độ theo thời gian</span>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
@@ -2454,14 +2558,16 @@ function CalendarView({
   const hours = Array.from({ length: 23 }, (_, i) => 0 + i); // 08:00 - 19:00
   // Lưu tạm lịch mới tạo để hiển thị ngay
   const [internalCalls, setInternalCalls] = React.useState([]);
+  const [cancelledIds, setCancelledIds] = React.useState(() => new Set());
+
   const allCalls = React.useMemo(() => {
-    const map = new Map();
-    [...(calls || []), ...internalCalls].forEach((c) => {
-      const key = `${c.startTime}-${c.endTime}`;
-      if (!map.has(key)) map.set(key, c);
+    const merged = [...(calls || []), ...internalCalls];
+    return merged.filter((c) => {
+      const id = c._id?.toString();
+      if (id && cancelledIds.has(id)) return false;
+      return c.status !== "cancelled" && c.status !== "cancelled";
     });
-    return [...map.values()];
-  }, [calls, internalCalls]);
+  }, [calls, internalCalls, cancelledIds]);
   // Modal đặt lịch
   const [open, setOpen] = React.useState(false);
   const [patientQuery, setPatientQuery] = React.useState("");
@@ -2488,7 +2594,7 @@ function CalendarView({
     if (!q) return patients;
     return patients.filter(
       (p) =>
-        p.accountId.fullName.toLowerCase().includes(q) ||
+        p.accountId?.fullName.toLowerCase().includes(q) ||
         (p.tags || []).some((t) => (t || "").toLowerCase().includes(q))
     );
   }, [patientQuery, patients]);
@@ -2512,24 +2618,29 @@ function CalendarView({
       return;
     }
     const room = rooms.find((e) => e.userId === pickedPatientId);
-    console.log(room);
     const payload = {
       roomId: room._id,
       startTime: startDT,
       endTime: endDT,
       status: "pending",
     };
-    console.log(payload);
     // // 1) Hiển thị ngay
 
     // // 2) Chuyển view sang tuần chứa ngày vừa đặt (để chắc chắn thấy slot)
 
     // // 3) Gọi parent/backend nếu có
     // if (typeof onCreateCall === "function") {
-    const check = await onCreateCall(payload);
-    console.log(check);
+    const { check, appointment } = await onCreateCall(payload);
     if (check === true) {
-      setInternalCalls((prev) => [payload, ...prev]);
+      const _id = appointment._id;
+      const payloadUI = {
+        _id,
+        roomId: room,
+        startTime: startDT,
+        endTime: endDT,
+        status: "pending",
+      };
+      setInternalCalls((prev) => [payloadUI, ...prev]);
       setWeekRef(startDT);
       setOpen(false);
     }
@@ -2608,6 +2719,8 @@ function CalendarView({
               sessions={sessions}
               setCallRoomId={setCallRoomId}
               setSessionData={setSessionData}
+              setInternalCalls={setInternalCalls}
+              setCancelledIds={setCancelledIds}
             />
           ))}
         </div>
@@ -2665,7 +2778,7 @@ function CalendarView({
                       pickedPatientId === p._id ? "bg-zinc-200" : ""
                     }`}
                   >
-                    <Avatar name={p.accountId.fullName} />
+                    <Avatar name={p.accountId?.fullName} />
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">
                         {p.accountId.fullName}
@@ -2730,6 +2843,7 @@ function CalendarCell({
   setSessionData,
   sessions,
   setCallRoomId,
+  setCancelledIds,
 }) {
   const callsInHour = findCallsInHour(calls, date, hour);
   const [cancelModal, setCancelModal] = useState({
@@ -2846,11 +2960,11 @@ function CalendarCell({
               `}
                   disabled={!canJoin && !isCompleted}
                   onClick={() => {
-                    if (btnLabel === "Xem chi tiết") {
+                    if (btnLabel === "Xem chi tiết" && isCompleted) {
                       setSessionData(session);
                       setOpenCallDetails(true);
                     }
-                    if (canJoin) {
+                    if (canJoin && btnLabel === "Vào phòng" && !isCompleted) {
                       setOpenCall(true);
                       setCallRoomId(call._id);
                     }
@@ -2890,7 +3004,14 @@ function CalendarCell({
             <div className="bg-white rounded-xl p-5 w-full max-w-lg shadow-lg">
               <h3 className="text-lg font-semibold mb-1">
                 Hủy cuộc hẹn với bệnh nhân{" "}
-                {cancelModal.call.roomId.userId.accountId.fullName}
+                {cancelModal.call.roomId.userId?.accountId?.fullName ||
+                  patients.find(
+                    (e) =>
+                      e._id ===
+                      (cancelModal.call.roomId?.userId?._id ||
+                        cancelModal.call?.roomId?.userId)
+                  ).accountId?.fullName ||
+                  "benh nhan"}
               </h3>
 
               <label className="text-sm text-slate-600">
@@ -2939,6 +3060,11 @@ function CalendarCell({
                       );
 
                       toast.success("Đã hủy cuộc hẹn thành công");
+                      setCancelledIds((prev) => {
+                        const next = new Set(prev);
+                        next.add(cancelModal.call._id.toString());
+                        return next;
+                      });
                       setInternalCalls((prev) =>
                         prev.filter((c) => c._id !== cancelModal.call._id)
                       );
@@ -3635,7 +3761,7 @@ function NotificationsView({ notifications, onMarkAll }) {
         {notifications.map((n) => (
           <div
             key={n._id}
-            className={`flex items-center gap-3 rounded-2xl border p-3 ${
+            className={`flex items-center gap-3 rounded-2xl border p-3 w-full ${
               n.read ? "opacity-60" : ""
             }`}
           >
@@ -3650,11 +3776,19 @@ function NotificationsView({ notifications, onMarkAll }) {
             >
               <Bell className="h-5 w-5" />
             </div>
-            <div className="min-w-0">
-              <div className="truncate text-sm">{n.text}</div>
-              <div className="text-xs text-zinc-500">{fmtDateTime(n.at)}</div>
+            <div className="min-w-0 flex w-full justify-between">
+              <div>
+                <div className="truncate text-sm">
+                  {n.title} {!n.read && <Badge tone="info">Mới</Badge>}
+                </div>
+                <div className="truncate text-sm">{n.message}</div>
+              </div>
+              <div>
+                <div className="text-xs text-zinc-500 ">
+                  {prettyTime(n.createdAt)}
+                </div>
+              </div>
             </div>
-            {!n.read && <Badge tone="info">Mới</Badge>}
           </div>
         ))}
       </div>

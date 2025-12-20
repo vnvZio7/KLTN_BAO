@@ -81,7 +81,7 @@ export async function notifyAppointment15Minutes() {
     await Notification.create({
       userId: room.userId._id,
       title: "Sắp đến giờ hẹn",
-      message: `15 phút nữa sẽ bắt đầu cuộc gọi với bác sĩ ${room.doctorId.fullName}`,
+      message: `15 phút nữa sẽ bắt đầu cuộc gọi với bác sĩ ${room.doctorId.accountId.fullName}`,
       type: "system",
     });
 
@@ -89,7 +89,7 @@ export async function notifyAppointment15Minutes() {
     await Notification.create({
       doctorId: room.doctorId._id,
       title: "Sắp đến giờ khám",
-      message: `15 phút nữa sẽ bắt đầu cuộc gọi với bệnh nhân ${room.userId.fullName}`,
+      message: `15 phút nữa sẽ bắt đầu cuộc gọi với bệnh nhân ${room.userId.accountId.fullName}`,
       type: "system",
     });
 

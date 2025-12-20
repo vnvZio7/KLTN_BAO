@@ -34,6 +34,7 @@ const userSchema = new mongoose.Schema(
         reason: { type: String },
       },
     ],
+    notes: [{ content: String, createdAt: { type: Date, default: Date.now } }],
   },
   { timestamps: true }
 );
