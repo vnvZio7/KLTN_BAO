@@ -1,3 +1,4 @@
+import roomModel from "../models/room.model.js";
 import User from "../models/user.model.js";
 import { createNotification } from "./notificationController.js";
 // @desc    Get all users (Admin only)
@@ -161,6 +162,63 @@ const getUsersSwitchDoctor = async (req, res) => {
   }
 };
 
+const chooseDoctor = async (req, res) => {
+  try {
+    const { doctorId } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.currentDoctorId = doctorId;
+
+    // 3. Tạo Room nếu chưa có
+
+    let room = await roomModel.findOne({
+      userId: user._id,
+      doctorId,
+    });
+
+    if (!room) {
+      room = await roomModel.create({
+        userId: user._id,
+        doctorId,
+        status: "active",
+        startDate: new Date(),
+      });
+    } else {
+      // 👉 Đã có → mở lại room
+      room.status = "active";
+      room.endDate = null;
+      await room.save();
+    }
+
+    await user.save();
+    await createNotification({
+      userId: req.user._id,
+      title1: "Kết nối thành công tới bác sĩ",
+      message:
+        "Hệ thống đã kết nối thành công bạn với bác sĩ. Xem chi tiết ở trang thông tin bác sĩ",
+      type: "system",
+    });
+    await createNotification({
+      doctorId,
+      title1: "Bệnh nhân mới",
+      message: `Bạn vừa được ghép nối với một bệnh nhân - ${req.account.fullName}`,
+      type: "system",
+    });
+
+    return res.json({
+      success: true,
+      user,
+      room,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 const updateSwitchDoctorId = async (req, res) => {
   try {
     const { currentDoctorId, switchDoctorId, status, reason } = req.body;
@@ -244,4 +302,5 @@ export {
   updateUserAfterReTest,
   updateFreeCallUser,
   addNote,
+  chooseDoctor,
 };

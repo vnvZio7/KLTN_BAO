@@ -3,6 +3,9 @@ import { CheckCircle2 } from "lucide-react";
 import { prettyTime } from "../../../../utils/helper";
 import { INITIAL_MESSAGES } from "../../../../utils/data";
 import { useUserContext } from "../../../../context/userContext";
+import axiosInstance from "../../../../utils/axiosInstance";
+import { API_PATHS } from "../../../../utils/apiPaths";
+import toast from "react-hot-toast";
 
 export default function ChatPage({
   room,
@@ -10,16 +13,16 @@ export default function ChatPage({
   messages,
   setMessages,
   onSend,
-  onComplete, // optional: callback khi đánh dấu hoàn thành
-  onSendComplete, // optional: callback gửi yêu cầu hoàn thành tới bác sĩ/backend
   onlineUsers,
 }) {
   const [text, setText] = useState("");
-  const [completed, setCompleted] = useState(false);
+  const [completed, setCompleted] = useState("");
   const listRef = useRef(null);
-  const { subcribeToMessages, unSubcribeToMessages } = useUserContext();
+  const { subcribeToMessages, unSubcribeToMessages, fetchUser } =
+    useUserContext();
   useEffect(() => {
     if (!room?._id) return;
+    setCompleted(room.status);
     subcribeToMessages(room._id);
     return () => unSubcribeToMessages();
   }, [room?._id, subcribeToMessages, unSubcribeToMessages]);
@@ -58,23 +61,22 @@ export default function ChatPage({
     // 3) Gửi callback lên parent/backend nếu cần
     try {
       // 1) Ẩn nút
-      setCompleted(true);
+      setCompleted("pause");
 
       // 2) Thêm system message để cả hai phía đều thấy lịch sử yêu cầu
-      const sysMsg = {
-        id: Math.random().toString(36).slice(2),
-        senderType: "system",
-        content:
-          "Bạn đã đánh dấu HOÀN THÀNH khóa điều trị. Yêu cầu đã được gửi tới bác sĩ.",
-        createdAt: new Date().toISOString(),
-      };
+      // const sysMsg = {
+      //   id: Math.random().toString(36).slice(2),
+      //   senderType: "system",
+      //   content:
+      //     ,
+      //   createdAt: new Date().toISOString(),
+      // };
 
-      setMessages((prev) => [...prev, sysMsg]);
-      await onSendComplete?.({
-        doctorId: doctor?.id,
-        at: new Date().toISOString(),
-        type: "chat_completed_request",
+      const res = await axiosInstance.patch(API_PATHS.ROOMS.UPDATE_ROOM, {
+        roomId: room._id,
+        status: "pause",
       });
+      toast.success("");
       // thông báo badge/unread cho phía bác sĩ (tuỳ ý)
     } catch (e) {
       // Nếu lỗi gửi backend, vẫn giữ trạng thái completed & message
@@ -82,7 +84,6 @@ export default function ChatPage({
     }
 
     // 4) Callback hoàn thành cho parent (tuỳ chọn)
-    onComplete?.();
   };
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export default function ChatPage({
   return (
     <div className="relative bg-white rounded-2xl shadow-sm border border-slate-200 h-[72vh] flex flex-col">
       {/* Nút Hoàn thành (ẩn sau khi đã hoàn thành) */}
-      {!completed && (
+      {completed === "active" ? (
         <button
           onClick={handleComplete}
           className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-white shadow-sm"
@@ -105,6 +106,67 @@ export default function ChatPage({
           <CheckCircle2 className="h-4 w-4" />
           Hoàn thành
         </button>
+      ) : completed === "pause" ? (
+        room.sendId === "doctor" ? (
+          <div className="absolute top-4 z-10 gap-1 w-full">
+            <div className="flex justify-center items-center  text-xs font-medium text-emerald-700 ">
+              Bác sĩ đã đánh dấu HOÀN THÀNH khóa điều trị. Hãy phản hồi trong
+              thời gian sớm nhất.
+            </div>
+            <div className="flex justify-center items-center mt-1">
+              <button
+                onClick={async () => {
+                  try {
+                    await axiosInstance.patch(API_PATHS.ROOMS.UPDATE_ROOM, {
+                      roomId: room._id,
+                      status: "completed",
+                    });
+                    toast.success("Đã chấp nhận yêu cầu của bác sĩ");
+                    fetchUser();
+                  } catch (error) {
+                    console.error(error.message);
+                  }
+                }}
+                className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-white shadow-sm"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Chấp nhận
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await axiosInstance.patch(API_PATHS.ROOMS.UPDATE_ROOM, {
+                      roomId: room._id,
+                      status: "active",
+                    });
+                    toast.success("Đã từ chối yêu cầu của bác sĩ");
+                    fetchUser();
+                  } catch (error) {
+                    console.error(error.message);
+                  }
+                }}
+                className=" inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-white shadow-sm"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Từ chối
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="absolute top-12 z-10 gap-1 w-full">
+            <div className="flex justify-center items-center  text-xs font-medium text-emerald-700 ">
+              Bạn đã đánh dấu HOÀN THÀNH khóa điều trị. Yêu cầu đã được gửi tới
+              bác sĩ.
+            </div>
+          </div>
+        )
+      ) : (
+        <div className="absolute top-12 z-10 gap-1 w-full">
+          <div className="flex justify-center items-center  text-xs font-medium text-emerald-700 ">
+            Bạn đã HOÀN THÀNH khóa điều trị. Nếu muốn điều trị tiếp hãy chọn bác
+            sĩ ở phần "Thông tin bác sĩ".
+          </div>
+        </div>
       )}
 
       {/* Header chat có ảnh bác sĩ */}
@@ -168,21 +230,23 @@ export default function ChatPage({
       </div>
 
       {/* Composer */}
-      <div className="p-3 border-t border-slate-200 flex items-center gap-2">
-        <input
-          className="flex-1 rounded-xl border border-slate-300 px-3 py-2"
-          placeholder="Nhập tin nhắn…"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send(e)}
-        />
-        <button
-          onClick={send}
-          className="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
-        >
-          Gửi
-        </button>
-      </div>
+      {room.status !== "completed" && (
+        <div className="p-3 border-t border-slate-200 flex items-center gap-2">
+          <input
+            className="flex-1 rounded-xl border border-slate-300 px-3 py-2"
+            placeholder="Nhập tin nhắn…"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send(e)}
+          />
+          <button
+            onClick={send}
+            className="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700"
+          >
+            Gửi
+          </button>
+        </div>
+      )}
     </div>
   );
 }

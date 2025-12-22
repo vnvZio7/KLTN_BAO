@@ -1,5 +1,9 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { currency } from "../../../../utils/helper";
+import axiosInstance from "../../../../utils/axiosInstance";
+import { API_PATHS } from "../../../../utils/apiPaths";
+import toast from "react-hot-toast";
+import { useUserContext } from "../../../../context/userContext";
 
 /* ---------------- Small UI atoms ---------------- */
 function Tag({ children }) {
@@ -191,35 +195,55 @@ function Pagination({ page, totalPages, onChange }) {
   );
 }
 
-function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
+function SwitchDoctorModal({
+  open,
+  onClose,
+  suggestions = [], // AI gợi ý
+  allDoctors = [], // ✅ thêm: tất cả bác sĩ (fetch sẵn từ parent)
+  onPick,
+  note = "",
+}) {
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
   const [sort, setSort] = useState("reco");
   const [page, setPage] = useState(1);
+  const { fetchUser } = useUserContext();
   const pageSize = 4;
 
-  // 👉 thêm state cho popup nhập lý do
+  // ✅ NEW: mode xem
+  const [viewMode, setViewMode] = useState("ai"); // "ai" | "all"
+
+  // popup nhập lý do
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [reason, setReason] = useState("");
   const [showReasonModal, setShowReasonModal] = useState(false);
 
-  const cards = useMemo(() => suggestions.map(mapDoctorCard), [suggestions]);
+  // ✅ nguồn dữ liệu theo mode
+  const source = useMemo(() => {
+    return viewMode === "all" ? allDoctors : suggestions;
+  }, [viewMode, allDoctors, suggestions]);
+
+  // ✅ map card theo source
+  const cards = useMemo(() => (source || []).map(mapDoctorCard), [source]);
 
   const filtered = useMemo(() => {
     let list = cards.slice();
     const kw = q.trim().toLowerCase();
+
     if (kw) {
       list = list.filter((d) => {
-        const sps = d.specializations.join(" ").toLowerCase();
-        const mods = d.modalities.join(" ").toLowerCase();
+        const sps = (d.specializations || []).join(" ").toLowerCase();
+        const mods = (d.modalities || []).join(" ").toLowerCase();
         return (
-          d.name.toLowerCase().includes(kw) ||
+          (d.name || "").toLowerCase().includes(kw) ||
           sps.includes(kw) ||
           mods.includes(kw)
         );
       });
     }
+
     if (role !== "all") list = list.filter((d) => d.role === role);
+
     switch (sort) {
       case "priceAsc":
         list.sort((a, b) => a.pricePerWeek - b.pricePerWeek);
@@ -234,7 +258,7 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
         list.sort((a, b) => b.yearsExperience - a.yearsExperience);
         break;
       default:
-        break; // giữ thứ tự backend đề xuất
+        break; // "reco": giữ thứ tự backend/AI
     }
     return list;
   }, [cards, q, role, sort]);
@@ -245,12 +269,16 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
   const start = (currentPage - 1) * pageSize;
   const pageItems = filtered.slice(start, start + pageSize);
 
+  // ✅ reset page khi đổi mode/filters
+  useEffect(() => {
+    setPage(1);
+  }, [viewMode, q, role, sort, open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
       if (e.key === "Escape") {
         if (showReasonModal) {
-          // nếu đang mở popup lý do thì đóng popup trước
           setShowReasonModal(false);
           setSelectedDoctor(null);
           setReason("");
@@ -267,12 +295,10 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
 
   const handleSubmitReason = () => {
     if (!selectedDoctor || !reason.trim()) return;
-    // gửi cho parent để gọi API lên admin
     onPick?.({
       picked: selectedDoctor,
       reason: reason.trim(),
     });
-    // reset state + đóng modal chọn bác sĩ (tuỳ bạn muốn đóng hay để lại)
     setShowReasonModal(false);
     setSelectedDoctor(null);
     setReason("");
@@ -285,68 +311,102 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
+
       <div className="relative w-full max-w-5xl mx-auto mt-5 rounded-2xl border border-slate-200 bg-white/90 backdrop-blur p-5 shadow-2xl">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Chọn bác sĩ thay thế</h3>
+
+          <div className="flex items-center gap-2">
+            {!!note && <span className="text-red-500 underline">{note}</span>}
+
+            <button
+              onClick={onClose}
+              className="px-2 py-1 rounded hover:bg-slate-100"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* ✅ Toggle mode: AI / ALL */}
+        <div className="mt-3 flex items-center gap-2">
           <button
-            onClick={onClose}
-            className="px-2 py-1 rounded hover:bg-slate-100"
+            onClick={() => setViewMode("ai")}
+            className={`px-3 py-1.5 rounded-xl text-sm border transition ${
+              viewMode === "ai"
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "bg-white border-slate-300 hover:bg-slate-50"
+            }`}
           >
-            ✕
+            AI gợi ý trước đó ({suggestions.length})
           </button>
+
+          <button
+            onClick={() => setViewMode("all")}
+            className={`px-3 py-1.5 rounded-xl text-sm border transition ${
+              viewMode === "all"
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "bg-white border-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            Tất cả bác sĩ ({allDoctors.length})
+          </button>
+
+          <div className="ml-auto text-xs text-slate-600">
+            Đang xem:{" "}
+            <span className="font-semibold">
+              {viewMode === "ai" ? "AI gợi ý" : "Tất cả"}
+            </span>
+          </div>
         </div>
 
         {/* Filters */}
-        <div className="mt-3 grid gap-3 md:grid-cols-4 ">
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
           <div className="relative">
             <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               className="placeholder:text-gray-600 w-full rounded-xl border border-slate-300 pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
               placeholder="Tìm theo tên / chuyên môn / phương pháp…"
               value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => setQ(e.target.value)}
             />
           </div>
+
           <select
             className="rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             value={role}
-            onChange={(e) => {
-              setRole(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setRole(e.target.value)}
           >
             <option value="all">Tất cả vai trò</option>
             <option value="counselor">Counselor</option>
             <option value="therapist">Therapist</option>
             <option value="psychiatrist">Psychiatrist</option>
           </select>
+
           <select
             className="rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             value={sort}
-            onChange={(e) => {
-              setSort(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setSort(e.target.value)}
           >
-            <option value="reco">Phù hợp</option>
+            {viewMode !== "all" && <option value="reco">Phù hợp</option>}
             <option value="priceAsc">Giá tăng dần</option>
             <option value="priceDesc">Giá giảm dần</option>
             <option value="ratingDesc">Rating cao</option>
             <option value="expDesc">Kinh nghiệm cao</option>
           </select>
+
           <div className="text-sm text-slate-600 grid place-items-end">
             {total} bác sĩ
           </div>
         </div>
 
         {/* List */}
-        <div className="mt-3 grid gap-3 md:grid-cols-2 ">
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
           {pageItems.length === 0 ? (
             <div className="col-span-2 text-slate-600 text-sm">
-              Không có gợi ý phù hợp. Thử đổi bộ lọc hoặc từ khóa.
+              {viewMode === "all"
+                ? "Chưa có dữ liệu bác sĩ. Hãy fetch allDoctors từ backend."
+                : "Không có gợi ý phù hợp. Thử đổi bộ lọc hoặc từ khóa."}
             </div>
           ) : (
             pageItems.map((d) => (
@@ -363,27 +423,45 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
                     alt={d.name}
                     className="h-16 w-16 rounded-xl object-contain ring-1 ring-black/5"
                   />
+
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-nowrap justify-between">
                       <div className="flex gap-2 flex-wrap">
                         <div className="font-semibold">{d.name}</div>
                         <Tag>{roleLabel(d.role)}</Tag>
                       </div>
+
                       <button
-                        onClick={() => {
-                          // 👉 mở popup nhập lý do
-                          setSelectedDoctor(d);
-                          setReason("");
-                          setShowReasonModal(true);
+                        onClick={async () => {
+                          if (!!note) {
+                            try {
+                              await axiosInstance.post(
+                                API_PATHS.USERS.CHOOSE_DOCTOR,
+                                {
+                                  doctorId: d.id,
+                                }
+                              );
+                              toast.success("Chọn bác sĩ thành công");
+                              fetchUser();
+                            } catch (e) {
+                              console.error(e.message);
+                            }
+                          } else {
+                            setSelectedDoctor(d);
+                            setReason("");
+                            setShowReasonModal(true);
+                          }
                         }}
-                        className="px-3 py-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:opacity-95 text-sm shadow "
+                        className="px-3 py-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:opacity-95 text-sm shadow"
                       >
                         Chọn bác sĩ này
                       </button>
                     </div>
+
                     <p className="mt-1 text-sm text-slate-700 line-clamp-2">
                       {d.bio}
                     </p>
+
                     <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-700">
                       <div className="inline-flex items-center gap-1">
                         <StarRating value={d.rating} />
@@ -392,9 +470,9 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
                       <div>🎓 {d.yearsExperience} năm KN</div>
                       <div>💳 {currency(d.pricePerWeek)}/tuần</div>
                     </div>
+
                     {(d.specializations.length || d.modalities.length) && (
                       <div className="mt-2">
-                        {/* Chuyên môn */}
                         <div>
                           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                             Chuyên môn
@@ -410,7 +488,6 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
                           )}
                         </div>
 
-                        {/* Phương pháp */}
                         <div className="mt-2">
                           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                             Phương pháp
@@ -434,11 +511,12 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
           )}
         </div>
 
-        {/* Pagination */}
+        {/* Pagination + Mode buttons */}
         <div className="mt-5 flex items-center justify-between">
           <div className="text-sm text-slate-600">
             Trang {currentPage}/{totalPages}
           </div>
+
           <Pagination
             page={currentPage}
             totalPages={totalPages}
@@ -447,7 +525,7 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
         </div>
       </div>
 
-      {/* 👉 Popup nhập lý do đổi bác sĩ */}
+      {/* Popup nhập lý do */}
       {showReasonModal && selectedDoctor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
@@ -465,14 +543,16 @@ function SwitchDoctorModal({ open, onClose, suggestions = [], onPick }) {
             <p className="text-sm text-slate-600 mb-3">
               Yêu cầu đổi sang bác sĩ:{" "}
               <span className="font-semibold">{selectedDoctor.name}</span>. Vui
-              lòng mô tả ngắn gọn lý do để đội ngũ admin xem xét.
+              lòng mô tả ngắn gọn lý do để admin xem xét.
             </p>
+
             <textarea
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 min-h-[100px]"
-              placeholder="Ví dụ: Không phù hợp phong cách làm việc, muốn tìm bác sĩ nhiều kinh nghiệm hơn về vấn đề của mình..."
+              placeholder="Ví dụ: Không phù hợp phong cách làm việc, muốn tìm bác sĩ nhiều kinh nghiệm hơn..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
+
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => {
@@ -505,6 +585,8 @@ export default function DoctorInfoPage({
   doctor,
   suggestions = [],
   onSwitch,
+  allDoctors,
+  room,
 }) {
   const [openSwitch, setOpenSwitch] = useState(false);
   const [certOpen, setCertOpen] = useState(false);
@@ -524,7 +606,20 @@ export default function DoctorInfoPage({
   const nextCert = () => setCertIndex((i) => (i + 1) % certs.length);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {room.status === "completed" && (
+        <div className="absolute z-40 w-full h-full bg-white/80">
+          <div className="flex w-full h-full items-center justify-center">
+            <button
+              onClick={() => setOpenSwitch(true)}
+              className="bg-blue-500 text-white px-2 py-1 rounded"
+            >
+              Chon bac si
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <section className="rounded-2xl border border-slate-200 bg-gradient-to-r from-white to-indigo-50/60 p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
         <div className="flex items-start gap-4">
@@ -655,7 +750,13 @@ export default function DoctorInfoPage({
       <SwitchDoctorModal
         open={openSwitch}
         onClose={() => setOpenSwitch(false)}
-        suggestions={suggestions.filter((d) => d._id !== doctor._id)}
+        suggestions={
+          room.status === "completed"
+            ? suggestions
+            : suggestions.filter((d) => d._id !== doctor._id)
+        }
+        allDoctors={allDoctors}
+        note={room.status === "completed" && "Danh sách AI gợi ý trước đó"}
         onPick={({ picked, reason }) => {
           // setOpenSwitch(false);
           onSwitch?.({ picked, reason }); // picked.id = _id

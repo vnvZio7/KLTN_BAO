@@ -10,6 +10,7 @@ import {
   updateUserAfterReTest,
   updateFreeCallUser,
   addNote,
+  chooseDoctor,
 } from "../controllers/userController.js";
 
 const router = express.Router();
@@ -24,5 +25,6 @@ router.patch("/retest/", protect, updateUserAfterReTest);
 router.patch("/retest/:id", protect, updateRetest);
 router.patch("/free-call", protect, updateFreeCallUser);
 router.post("/add-note", protect, addNote);
+router.post("/choose-doctor", protect, chooseDoctor);
 
 export default router;

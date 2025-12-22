@@ -17,6 +17,7 @@ export const API_PATHS = {
     UPDATE_SWITCH_DOCTOR: `/api/users/update`,
     UPDATE_FREE_CALL: `/api/users/free-call`,
     ADD_NOTE: `/api/users/add-note`,
+    CHOOSE_DOCTOR: `/api/users/choose-doctor`,
     UPDATE_RETEST: (id) => `/api/users/retest/${id}`,
   },
   ADMIN: {
@@ -47,6 +48,7 @@ export const API_PATHS = {
   ROOMS: {
     CREATE_ROOM: "/api/rooms",
     GET_ROOM: `/api/rooms`,
+    UPDATE_ROOM: `/api/rooms`,
   },
   TEST_RESULTS: {
     CREATE_TEST_RESULTS: "/api/testresult",

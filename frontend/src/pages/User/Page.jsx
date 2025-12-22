@@ -38,6 +38,7 @@ export default function Page() {
     notifications,
     setNotifications,
     sessions,
+    allDoctors,
   } = useUserContext();
 
   const [open, setOpen] = useState(false);
@@ -133,7 +134,9 @@ export default function Page() {
       {active === "doctor" && (
         <DoctorInfoPage
           user={user}
+          allDoctors={allDoctors}
           doctor={currentDoctor}
+          room={room}
           suggestions={doctors} // <— truyền mảng gợi ý
           onSwitch={async ({ picked, reason }) => {
             console.log(picked);

@@ -34,6 +34,9 @@ import {
   XIcon,
   RefreshCcwDotIcon,
   AlertCircleIcon,
+  AlertTriangle,
+  ThumbsDown,
+  ThumbsUp,
 } from "lucide-react";
 import { useUserContext } from "../../context/userContext";
 import axiosInstance from "../../utils/axiosInstance";
@@ -2178,14 +2181,7 @@ function TestHistoryChart({ history = [] }) {
   );
 }
 
-function MessagesView({
-  patients,
-  rooms,
-  activeId,
-  onDoctorComplete, // optional
-  onRespondComplete, // optional
-  onlineUsers,
-}) {
+function MessagesView({ patients, rooms, activeId, onlineUsers }) {
   const [activePatientId, setActivePatientId] = useState(
     activeId || patients[0]?._id || null
   );
@@ -2196,6 +2192,8 @@ function MessagesView({
     subcribeToMessages,
     unSubcribeToMessages,
     setMessages,
+    fetchUser,
+    setRooms,
   } = useUserContext();
   const [text, setText] = useState("");
   const [room, setRoom] = useState([]);
@@ -2212,6 +2210,7 @@ function MessagesView({
   }, [ap?._id, rooms, fetchMessages]);
   useEffect(() => {
     if (!room?._id) return;
+    console.log(room);
     subcribeToMessages(room._id);
     return () => unSubcribeToMessages();
   }, [room?._id, subcribeToMessages, unSubcribeToMessages]);
@@ -2221,50 +2220,33 @@ function MessagesView({
       behavior: "smooth",
     });
   }, [messages]);
-  const isCompleted = ap?.chatStatus === "completed";
-  const pendingUserRequest =
-    ap?.completeRequest?.status === "pending" &&
-    ap?.completeRequest?.from === "user";
-
+  const isCompleted = room?.status === "completed";
+  const pendingUserRequest = room?.status === "pause";
   // Bác sĩ chủ động bấm HOÀN THÀNH
-  const handleDoctorComplete = () => {
+  const handleDoctorComplete = async () => {
     if (!ap) return;
     const ok = window.confirm(
       "Bạn có chắc chắn muốn hoàn thành khóa điều trị này?"
     );
     if (!ok) return;
-
-    // setPatients((ps) =>
-    //   ps.map((p) => {
-    //     if (p._id !== ap.id) return p;
-    //     const sysMsg = {
-    //       id: Math.random().toString(36).slice(2),
-    //       sender: "system",
-    //       text: "Bác sĩ đã đánh dấu HOÀN THÀNH khóa điều trị. Cảm ơn bạn đã trao đổi!",
-    //       at: new Date().toISOString(),
-    //     };
-    //     return {
-    //       ...p,
-    //       chatStatus: "completed",
-    //       // Nếu trước đó có pending từ user thì kết thúc luôn yêu cầu
-    //       completeRequest: p.completeRequest
-    //         ? { ...p.completeRequest, status: "accepted" }
-    //         : {
-    //             from: "doctor",
-    //             status: "accepted",
-    //             at: new Date().toISOString(),
-    //           },
-    //       messages: [...(p.messages || []), sysMsg],
-    //     };
-    //   })
-    // );
-
-    // Callback ra ngoài (gửi backend)
-    onDoctorComplete?.({ patientId: ap.id });
+    try {
+      const res = await axiosInstance.patch(API_PATHS.ROOMS.UPDATE_ROOM, {
+        roomId: room._id,
+        status: "pause",
+      });
+      toast.success("Đã gửi yêu cầu của người dùng");
+      setRooms((prev) =>
+        prev.map((r) =>
+          r._id === room._id ? { ...r, status: "pause", sendId: "doctor" } : r
+        )
+      );
+    } catch (error) {
+      console.error(error.message);
+    }
   };
 
   // Bác sĩ xử lý yêu cầu hoàn thành do user gửi lên
-  const respondUserComplete = (decision) => {
+  const respondUserComplete = async (decision) => {
     if (!ap) return;
     const ok = window.confirm(
       decision === "accept"
@@ -2272,35 +2254,29 @@ function MessagesView({
         : "Xác nhận TỪ CHỐI hoàn thành?"
     );
     if (!ok) return;
-
-    // setPatients((ps) =>
-    //   ps.map((p) => {
-    //     if (p._id !== ap.id) return p;
-
-    //     const accepted = decision === "accept";
-    //     const sysMsg = {
-    //       id: Math.random().toString(36).slice(2),
-    //       sender: "system",
-    //       text: accepted
-    //         ? "Yêu cầu hoàn thành từ người dùng đã được CHẤP NHẬN. Phiên chat kết thúc."
-    //         : "Yêu cầu hoàn thành từ người dùng đã bị TỪ CHỐI. Bạn có thể tiếp tục trao đổi.",
-    //       at: new Date().toISOString(),
-    //     };
-
-    //     return {
-    //       ...p,
-    //       chatStatus: accepted ? "completed" : p.chatStatus || "active",
-    //       completeRequest: {
-    //         ...(p.completeRequest || { from: "user" }),
-    //         status: accepted ? "accepted" : "rejected",
-    //         at: new Date().toISOString(),
-    //       },
-    //       messages: [...(p.messages || []), sysMsg],
-    //     };
-    //   })
-    // );
-
-    onRespondComplete?.({ patientId: ap.id, decision });
+    if (decision === "reject") {
+      try {
+        await axiosInstance.patch(API_PATHS.ROOMS.UPDATE_ROOM, {
+          roomId: room._id,
+          status: "active",
+        });
+        toast.success("Đã từ chối yêu cầu của người dùng");
+      } catch (error) {
+        console.error(error.message);
+      }
+    }
+    if (decision === "accept") {
+      try {
+        await axiosInstance.patch(API_PATHS.ROOMS.UPDATE_ROOM, {
+          roomId: room._id,
+          status: "completed",
+        });
+        toast.success("Đã chấp nhận yêu cầu của người dùng");
+      } catch (error) {
+        console.error(error.message);
+      }
+    }
+    fetchUser();
   };
 
   return patients.length > 0 ? (
@@ -2310,31 +2286,35 @@ function MessagesView({
         <div>
           <div className="mb-2 text-sm font-semibold">Cuộc hội thoại</div>
           <div className="space-y-2">
-            {patients.map((p) => (
-              <button
-                key={p._id}
-                onClick={() => setActivePatientId(p._id)}
-                className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left hover:bg-zinc-50 ${
-                  ap?._id === p._id ? "border-zinc-900" : "border-zinc-200"
-                }`}
-              >
-                <div className="relative">
-                  <Avatar name={p.accountId.fullName} />
-                  {onlineUsers.onlineUsers.includes(p._id) && (
-                    <span className="absolute bottom-0.5 size-2 rounded-full ring-2 ring-zinc-900 bg-green-500 right-0.5"></span>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">
-                    {p.accountId.fullName}
+            {patients.map((p) => {
+              const r = rooms.find((r) => r.userId === p._id);
+              if (!r) return;
+              return (
+                <button
+                  key={p._id}
+                  onClick={() => setActivePatientId(p._id)}
+                  className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left hover:bg-zinc-50 ${
+                    ap?._id === p._id ? "border-zinc-900" : "border-zinc-200"
+                  }`}
+                >
+                  <div className="relative">
+                    <Avatar name={p.accountId.fullName} />
+                    {onlineUsers.onlineUsers.includes(p._id) && (
+                      <span className="absolute bottom-0.5 size-2 rounded-full ring-2 ring-zinc-900 bg-green-500 right-0.5"></span>
+                    )}
                   </div>
-                  <div className="truncate text-xs text-zinc-500">
-                    {rooms.find((r) => r.userId === p._id).lastMessage || "—"}
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">
+                      {p.accountId.fullName}
+                    </div>
+                    <div className="truncate text-xs text-zinc-500">
+                      {r?.lastMessage || "—"}
+                    </div>
                   </div>
-                </div>
-                {p.unread > 0 && <Badge tone="info">{p.unread}</Badge>}
-              </button>
-            ))}
+                  {p.unread > 0 && <Badge tone="info">{p.unread}</Badge>}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -2354,7 +2334,7 @@ function MessagesView({
 
             <div className="ml-auto flex items-center gap-2">
               {/* Nút HOÀN THÀNH thay cho gọi video; ẩn nếu đã hoàn thành */}
-              {!isCompleted && (
+              {!isCompleted && !pendingUserRequest && (
                 <IconBtn
                   icon={CheckCircle2}
                   onClick={handleDoctorComplete}
@@ -2367,7 +2347,7 @@ function MessagesView({
           </div>
 
           {/* Banner xử lý yêu cầu hoàn thành từ User */}
-          {pendingUserRequest && !isCompleted && (
+          {pendingUserRequest && room.sendId === "user" && !isCompleted && (
             <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 flex items-start gap-2">
               <AlertTriangle className="mt-[2px] h-4 w-4" />
               <div className="flex-1">

@@ -18,9 +18,9 @@ const roomSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["active", "completed", "paused"],
-      sendId: String,
       default: "active",
     },
+    sendId: String,
     lastMessageAt: { type: Date },
     lastMessage: String,
   },
