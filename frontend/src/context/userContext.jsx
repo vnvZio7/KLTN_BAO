@@ -27,6 +27,7 @@ export const UserProvider = ({ children }) => {
 
   const [room, setRoom] = useState(null);
   const [rooms, setRooms] = useState([]);
+  const [allDoctors, setAllDoctors] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [appointments, setAppointments] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -53,6 +54,7 @@ export const UserProvider = ({ children }) => {
     setSessions([]);
     setRoom(null);
     setRooms([]);
+    setAllDoctors([]);
     setMessages([]);
     setUserSwitchs([]);
     setNotifications([]);
@@ -186,6 +188,17 @@ export const UserProvider = ({ children }) => {
     setRooms(allRooms);
     return allRooms;
   });
+
+  const fetchAllDoctors = useCallback(async () => {
+    try {
+      const { data } = await axiosInstance.get(
+        API_PATHS.DOCTORS.GET_ALL_DOCTORS
+      );
+      setAllDoctors(data.doctors);
+    } catch (error) {
+      console.error("fetchAllDoctors error:", error?.message || error);
+    }
+  }, []);
   const fetchMessages = useCallback(async (roomId) => {
     try {
       const { data } = await axiosInstance.get(
@@ -285,6 +298,7 @@ export const UserProvider = ({ children }) => {
 
       // ----- USER -----
       if (accountRole === "user" && dataUser.testHistory.length > 0) {
+        fetchAllDoctors();
         setDoctors(dataUser.doctorIds || []);
         setCurrentDoctor(dataUser.currentDoctorId || null);
         const r = await fetchRoom();
@@ -474,6 +488,8 @@ export const UserProvider = ({ children }) => {
       sessions,
       setSessions,
       setPatients,
+      allDoctors,
+      setRooms,
     }),
     [
       user,
@@ -513,6 +529,8 @@ export const UserProvider = ({ children }) => {
       sessions,
       setSessions,
       setPatients,
+      allDoctors,
+      setRooms,
     ]
   );
 
