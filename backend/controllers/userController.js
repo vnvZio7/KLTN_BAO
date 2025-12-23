@@ -7,7 +7,7 @@ import { createNotification } from "./notificationController.js";
 const getUsers = async (req, res) => {
   try {
     const users = await User.find().populate("accountId").select("-password");
-    res.json(users);
+    res.json({ users });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -43,7 +43,6 @@ const updateUser = async (req, res) => {
       lastGAD7Score,
       lastPHQ9Score,
     } = req.body;
-    const note = "Tình trạng bệnh: " + dominantSymptom;
     const user = await User.findByIdAndUpdate(
       req.user._id,
       {
@@ -55,7 +54,6 @@ const updateUser = async (req, res) => {
           lastGAD7Score,
           lastPHQ9Score,
           walletBalance,
-          notes: [note],
         },
       },
       { new: true } // trả về document sau khi update
