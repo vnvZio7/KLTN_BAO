@@ -2,10 +2,19 @@ import Doctor from "../models/doctor.model.js";
 
 const getDoctors = async (req, res) => {
   try {
-    const doctors = await Doctor.find({ "approval.status": "approved" })
-      .populate("accountId")
-      .select("-password")
-      .lean();
+    let doctors = null;
+    if (req.account.role === "admin") {
+      doctors = await Doctor.find()
+        .populate("accountId")
+        .select("-password")
+        .lean();
+      console.log(doctors);
+    } else {
+      doctors = await Doctor.find({ "approval.status": "approved" })
+        .populate("accountId")
+        .select("-password")
+        .lean();
+    }
     res.json({ doctors });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
