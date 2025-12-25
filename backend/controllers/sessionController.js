@@ -117,10 +117,11 @@ const createSession = async (req, res) => {
         recordingUrls: [],
       });
     }
-    console.log(session);
+    // console.log(session);
     const userId = session.appointmentId.roomId.userId;
+
     const user = await User.findById(userId).populate("currentDoctorId");
-    console.log(user);
+    // console.log(user);
     if (!user) {
       return res.status(404).json({ message: "User không tồn tại" });
     }
@@ -147,7 +148,6 @@ const createSession = async (req, res) => {
         user.firstCallInWeek = false;
       }
     }
-
     await user.save();
     res.status(201).json({ session });
   } catch (error) {
@@ -158,6 +158,7 @@ const createSession = async (req, res) => {
 const updateSession = async (req, res) => {
   try {
     const { appointmentId } = req.params;
+    console.log("start update");
     let recordingUrls = [];
     if (req.files?.length) {
       recordingUrls = await uploadManyBuffers(req.files, "pomera/recordings/");
@@ -182,7 +183,7 @@ const updateSession = async (req, res) => {
     session.durationSec = durationSec;
 
     await session.save();
-
+    console.log("update session");
     res.status(200).json({ message: "update session thành công!", session });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
