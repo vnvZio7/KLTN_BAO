@@ -246,7 +246,7 @@ export default function VideoCallPopup({ roomId, open, onClose, isDoctor }) {
   // ---------------------------------------------------------
   async function uploadDoctorRecording(blobs) {
     if (!appointmentId) return;
-    if (!blobs || !blobs.length) return;
+    // if (!blobs || !blobs.length) return;
 
     try {
       const formData = new FormData();
@@ -279,10 +279,10 @@ export default function VideoCallPopup({ roomId, open, onClose, isDoctor }) {
   }
   /** 🔥 Flush recordings to backend (gửi TẤT CẢ các đoạn) */
   async function flushRecordingsToServer() {
-    if (!IS_DOCTOR) return;
-    if (!doctorRecordingsRef.current.length) return;
+    // if (!IS_DOCTOR) return;
+    // if (!doctorRecordingsRef.current.length) return;
 
-    const blobs = doctorRecordingsRef.current;
+    const blobs = doctorRecordingsRef.current || [];
     doctorRecordingsRef.current = []; // clear ngay sau khi lấy ra để tránh double-upload
 
     await uploadDoctorRecording(blobs);
