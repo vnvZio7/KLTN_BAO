@@ -2535,7 +2535,7 @@ function CalendarView({
   // NEW: tuần đang hiển thị (mặc định tuần hiện tại)
   const [weekRef, setWeekRef] = React.useState(new Date());
   const week = buildWeekNoSunday(weekRef); // T2..T7
-  const hours = Array.from({ length: 23 }, (_, i) => 0 + i); // 08:00 - 19:00
+  const hours = Array.from({ length: 24 }, (_, i) => 0 + i); // 08:00 - 19:00
   // Lưu tạm lịch mới tạo để hiển thị ngay
   const [internalCalls, setInternalCalls] = React.useState([]);
   const [cancelledIds, setCancelledIds] = React.useState(() => new Set());
