@@ -1583,7 +1583,7 @@ function AdminDoctors({ doctors, onUpdateApproval }) {
   const [tab, setTab] = useState("pending"); // "pending" | "approved"
   const [selected, setSelected] = useState(null); // bác sĩ đang xem chi tiết
   const [showRejectReason, setShowRejectReason] = useState(false);
-
+  console.log("doctor:0 ", doctors);
   const filtered = useMemo(() => {
     return doctors.filter((d) => {
       const matchQ =
