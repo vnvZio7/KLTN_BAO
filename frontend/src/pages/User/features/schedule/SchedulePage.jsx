@@ -163,9 +163,9 @@ export default function SchedulePage({
           {history.map((a) => {
             const session =
               sessions.find(
-                (e) => e.appointmentId.toString() === a._id.toString()
+                (e) => e.appointmentId._id.toString() === a._id.toString()
               ) || null;
-            console.log(sessions, a._id);
+
             const isCompleted =
               (a.status === "completed" || a.status === "complete") && session;
             const isCancelled = a.status === "cancelled";
